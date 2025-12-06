@@ -2,8 +2,7 @@
 "use server";
 
 import type { CartItem, Order } from "@/lib/types";
-import { collection, doc, setDoc, serverTimestamp, getDocs, query, where } from "firebase/firestore";
-import { getSdks } from "@/firebase";
+import { collection, doc, setDoc, serverTimestamp, getDocs, query, where, Timestamp } from "firebase/firestore";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { firebaseConfig } from "@/firebase/config";
@@ -26,7 +25,6 @@ async function getFirestoreInstance() {
 }
 
 
-// In a real app, this would interact with a database like Firebase Firestore.
 export async function createOrder(orderInput: OrderInput): Promise<{ success: boolean; orderId?: string; error?: string }> {
   try {
     const db = await getFirestoreInstance();
@@ -35,16 +33,14 @@ export async function createOrder(orderInput: OrderInput): Promise<{ success: bo
     const orderId = `MM90-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
     // 2. Create the order object
-    const newOrder: Order = {
+    const newOrder: Omit<Order, 'createdAt'> & { createdAt: any } = {
       ...orderInput,
       orderId,
-      createdAt: serverTimestamp(),
+      createdAt: serverTimestamp(), // Use server timestamp for creation
     };
 
-    // 3. "Save" the order to Firestore
+    // 3. Save the order to Firestore
     await setDoc(doc(db, "orders_leads", orderId), newOrder);
-
-    // 4. In a real app, you might also want to update product stock here.
     
     console.log("Order created:", newOrder);
 
@@ -65,13 +61,15 @@ export async function trackOrder(orderId: string, phone: string): Promise<{ succ
 
         if (!querySnapshot.empty) {
             const orderDoc = querySnapshot.docs[0];
-            const order = orderDoc.data() as Order;
+            const orderData = orderDoc.data() as Omit<Order, 'createdAt'> & { createdAt: Timestamp };
+            
             // Firestore timestamps need to be converted for serialization
-            const serializableOrder = {
-              ...order,
-              createdAt: order.createdAt.toDate().toISOString(),
+            const serializableOrder: Order = {
+              ...orderData,
+              createdAt: orderData.createdAt.toDate().toISOString(),
             };
-            return { success: true, order: serializableOrder as unknown as Order };
+
+            return { success: true, order: serializableOrder };
         } else {
             return { success: false, error: "Order not found. Please check your Order ID and Phone Number." };
         }

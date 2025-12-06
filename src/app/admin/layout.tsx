@@ -20,6 +20,7 @@ import {
   Home,
   LogOut,
   Loader2,
+  ShieldAlert,
 } from "lucide-react";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -34,10 +35,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth, useUser } from "@/firebase";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { useFirestore } from "@/firebase";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+
+type AuthState = "loading" | "authenticated" | "unauthenticated" | "not-admin";
 
 export default function AdminLayout({
   children,
@@ -48,22 +52,39 @@ export default function AdminLayout({
   const auth = useAuth();
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
+  const [authState, setAuthState] = useState<AuthState>("loading");
 
   useEffect(() => {
-    if (!isUserLoading && !user) {
-      router.replace("/admin/login");
-    } else if (user && firestore) {
-      const checkAdmin = async () => {
-        const adminDocRef = doc(firestore, "admins", user.uid);
-        const adminDoc = await getDoc(adminDocRef);
-        if (!adminDoc.exists()) {
-          // Not an admin, sign out and redirect
-          await signOut(auth);
-          router.replace("/admin/login?error=not-admin");
-        }
-      };
-      checkAdmin();
+    if (isUserLoading || !firestore) {
+      // Still waiting for Firebase services to initialize
+      setAuthState("loading");
+      return;
     }
+
+    if (!user) {
+      // No user found, redirect to login
+      router.replace("/admin/login");
+      setAuthState("unauthenticated");
+      return;
+    }
+
+    // User is authenticated, now check if they are an admin
+    const checkAdminStatus = async () => {
+      const adminDocRef = doc(firestore, "admins", user.uid);
+      const adminDoc = await getDoc(adminDocRef);
+
+      if (adminDoc.exists()) {
+        // User is an admin
+        setAuthState("authenticated");
+      } else {
+        // User is not an admin, sign them out and redirect
+        setAuthState("not-admin");
+        await signOut(auth);
+        router.replace("/admin/login?error=not-admin");
+      }
+    };
+
+    checkAdminStatus();
   }, [user, isUserLoading, router, auth, firestore]);
 
   const handleLogout = async () => {
@@ -72,15 +93,28 @@ export default function AdminLayout({
       router.push("/admin/login");
     }
   };
-  
-  if (isUserLoading || !user) {
+
+  if (authState !== "authenticated") {
+    // Show a loading screen or an error message while checking auth
     return (
-      <div className="flex h-screen w-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        {authState === "loading" && <Loader2 className="h-8 w-8 animate-spin" />}
+        {authState === "not-admin" && (
+          <div className="w-full max-w-md p-4">
+            <Alert variant="destructive">
+              <ShieldAlert className="h-4 w-4" />
+              <AlertTitle>Access Denied</AlertTitle>
+              <AlertDescription>
+                You are not authorized to view this page. Redirecting to login...
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
       </div>
     );
   }
-
+  
+  // AuthState is "authenticated"
   return (
     <SidebarProvider>
       <div className="flex min-h-screen">

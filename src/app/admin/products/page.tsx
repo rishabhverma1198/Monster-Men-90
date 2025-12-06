@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Image from 'next/image';
 import { ProductForm } from "@/components/admin/ProductForm";
 import {
@@ -27,19 +27,17 @@ import {
 } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { File, ListFilter, MoreHorizontal, PlusCircle, Search, Trash2 } from "lucide-react";
+import { File, MoreHorizontal, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, deleteDoc, doc, getDocs, writeBatch } from "firebase/firestore";
+import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
+import { collection, deleteDoc, doc, getDocs, writeBatch, Timestamp } from "firebase/firestore";
 import type { Product, ProductVariant } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -85,13 +83,15 @@ function ProductRowSkeleton() {
 export default function AdminProductsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState("all");
   
   const firestore = useFirestore();
+  const { user, isUserLoading } = useUser();
   const productsQuery = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'products') : null),
-    [firestore]
+    () => (firestore && user && !isUserLoading ? collection(firestore, 'products') : null),
+    [firestore, user, isUserLoading]
   );
-  const { data: products, isLoading } = useCollection<Product>(productsQuery);
+  const { data: products, isLoading } = useCollection<Product & { createdAt: Timestamp }>(productsQuery);
 
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
 
@@ -120,8 +120,9 @@ export default function AdminProductsPage() {
           const imageRef = ref(storage, imageUrl);
           await deleteObject(imageRef);
         } catch (storageError: any) {
-          // Log if image deletion fails but don't block product deletion
-          console.warn(`Could not delete image ${imageUrl}:`, storageError);
+          if (storageError.code !== 'storage/object-not-found') {
+             console.warn(`Could not delete image ${imageUrl}:`, storageError);
+          }
         }
       }
 
@@ -151,7 +152,7 @@ export default function AdminProductsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Products</h1>
       </div>
-      <Tabs defaultValue="all">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="flex items-center">
           <TabsList>
             <TabsTrigger value="all">All Products</TabsTrigger>
@@ -205,7 +206,7 @@ export default function AdminProductsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isLoading ? (
+                  {isLoading || isUserLoading ? (
                     <>
                       <ProductRowSkeleton />
                       <ProductRowSkeleton />
@@ -240,7 +241,7 @@ export default function AdminProductsPage() {
                           ${product.price.toFixed(2)}
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
-                          {product.createdAt ? new Date(product.createdAt.toDate()).toLocaleDateString() : 'N/A'}
+                          {product.createdAt ? product.createdAt.toDate().toLocaleDateString() : 'N/A'}
                         </TableCell>
                         <TableCell>
                           <DropdownMenu>
@@ -286,7 +287,7 @@ export default function AdminProductsPage() {
               </CardDescription>
               </CardHeader>
               <CardContent>
-                  <ProductForm />
+                  <ProductForm onProductAdded={() => setActiveTab("all")} />
               </CardContent>
           </Card>
         </TabsContent>
@@ -315,5 +316,3 @@ export default function AdminProductsPage() {
     </>
   );
 }
-
-    

@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/select";
 import type { Order } from "@/lib/types";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, doc, updateDoc } from "firebase/firestore";
+import { collection, doc, updateDoc, Timestamp } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 
@@ -52,13 +52,15 @@ function OrderRowSkeleton() {
 
 export default function OrdersPage() {
   const firestore = useFirestore();
-  const { isUserLoading } = useUser();
+  const { user, isUserLoading } = useUser();
   const { toast } = useToast();
+
   const ordersQuery = useMemoFirebase(
-    () => (firestore && !isUserLoading ? collection(firestore, 'orders_leads') : null),
-    [firestore, isUserLoading]
+    () => (firestore && user && !isUserLoading ? collection(firestore, 'orders_leads') : null),
+    [firestore, user, isUserLoading]
   );
-  const { data: orders, isLoading } = useCollection<Order>(ordersQuery);
+  
+  const { data: orders, isLoading } = useCollection<Order & { createdAt: Timestamp }>(ordersQuery);
 
   const getTotalOrderValue = (order: Order) => {
     return order.items.reduce((total, item) => total + item.price * item.quantity, 0);
@@ -82,6 +84,8 @@ export default function OrdersPage() {
         });
     }
   }
+
+  const dataLoading = isLoading || isUserLoading;
 
   return (
     <div className="flex flex-col gap-4">
@@ -109,7 +113,7 @@ export default function OrdersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading || isUserLoading ? (
+              {dataLoading ? (
                 <>
                   <OrderRowSkeleton />
                   <OrderRowSkeleton />
@@ -123,7 +127,7 @@ export default function OrdersPage() {
                         <div className="font-medium">{order.name}</div>
                         <div className="text-sm text-muted-foreground">{order.phone}</div>
                     </TableCell>
-                    <TableCell>{order.createdAt ? new Date(order.createdAt.toDate()).toLocaleDateString() : 'N/A'}</TableCell>
+                    <TableCell>{order.createdAt ? order.createdAt.toDate().toLocaleDateString() : 'N/A'}</TableCell>
                     <TableCell className="text-center">{order.items.length}</TableCell>
                     <TableCell className="text-right">${getTotalOrderValue(order).toFixed(2)}</TableCell>
                     <TableCell className="text-center">

@@ -56,7 +56,11 @@ const productFormSchema = z.object({
 
 type ProductFormValues = z.infer<typeof productFormSchema>;
 
-export function ProductForm() {
+interface ProductFormProps {
+  onProductAdded?: () => void;
+}
+
+export function ProductForm({ onProductAdded }: ProductFormProps) {
     const { toast } = useToast();
     const [isMounted, setIsMounted] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -102,22 +106,21 @@ export function ProductForm() {
     const storage = getStorage();
 
     try {
+        // Use the slug as the document ID for cleaner URLs and easier lookups
+        const newProductRef = doc(firestore, "products", data.slug);
+        
         // 1. Upload images to Firebase Storage and get URLs
         const imageUrls: string[] = [];
         for (const imageFile of data.images) {
-            const storageRef = ref(storage, `products/${Date.now()}-${imageFile.name}`);
+            const storageRef = ref(storage, `products/${data.slug}/${imageFile.name}`);
             const snapshot = await uploadBytes(storageRef, imageFile);
             const downloadURL = await getDownloadURL(snapshot.ref);
             imageUrls.push(downloadURL);
         }
 
-        // 2. Prepare product and variant data for Firestore
-        const productsRef = collection(firestore, "products");
-        const newProductRef = doc(productsRef); // Auto-generate ID
-
         const batch = writeBatch(firestore);
 
-        // 3. Set the main product document
+        // 2. Set the main product document
         batch.set(newProductRef, {
             id: newProductRef.id,
             name: data.name,
@@ -131,16 +134,16 @@ export function ProductForm() {
             updatedAt: serverTimestamp(),
         });
 
-        // 4. Set the variant documents in the subcollection
+        // 3. Set the variant documents in the subcollection
         data.variants.forEach(variant => {
-            const variantRef = doc(collection(newProductRef, "variants"));
+            const variantRef = doc(collection(newProductRef, "variants")); // Auto-gen ID for variants
             batch.set(variantRef, {
               ...variant,
               productId: newProductRef.id
             });
         });
 
-        // 5. Commit the batch
+        // 4. Commit the batch
         await batch.commit();
 
         toast({
@@ -148,11 +151,14 @@ export function ProductForm() {
             description: `${data.name} has been successfully added to your store.`,
         });
         form.reset();
+        if (onProductAdded) {
+          onProductAdded();
+        }
     } catch (error) {
         console.error("Error adding product:", error);
         toast({
             title: "Error",
-            description: "Failed to add product. Please try again.",
+            description: "Failed to add product. A product with this slug might already exist.",
             variant: "destructive"
         });
     } finally {
@@ -171,7 +177,16 @@ export function ProductForm() {
                 <FormItem>
                 <FormLabel>Product Name</FormLabel>
                 <FormControl>
-                    <Input placeholder="e.g. Classic Blue Denim Jacket" {...field} />
+                    <Input 
+                      placeholder="e.g. Classic Blue Denim Jacket" 
+                      {...field}
+                      onChange={(e) => {
+                        field.onChange(e);
+                        // Auto-generate slug from name
+                        const slug = e.target.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+                        form.setValue('slug', slug);
+                      }}
+                    />
                 </FormControl>
                 <FormMessage />
                 </FormItem>
@@ -235,7 +250,22 @@ export function ProductForm() {
                     <FormItem>
                     <FormLabel>Base Price ($)</FormLabel>
                     <FormControl>
-                        <Input type="number" step="0.01" placeholder="e.g. 89.99" {...field} />
+                        <Input 
+                          type="number" 
+                          step="0.01" 
+                          placeholder="e.g. 89.99" 
+                          {...field}
+                          onChange={(e) => {
+                            const newPrice = parseFloat(e.target.value) || 0;
+                            field.onChange(newPrice);
+                            // Update variant prices if they are 0
+                            form.getValues('variants').forEach((variant, index) => {
+                              if (variant.price === 0) {
+                                form.setValue(`variants.${index}.price`, newPrice);
+                              }
+                            });
+                          }}
+                        />
                     </FormControl>
                     <FormMessage />
                     </FormItem>
@@ -394,7 +424,7 @@ export function ProductForm() {
                     <PlusCircle className="mr-2 h-4 w-4" /> Add Variant
                 </Button>
             </div>
-             <FormMessage>{form.formState.errors.variants?.message}</FormMessage>
+             <FormMessage>{form.formState.errors.variants?.root?.message}</FormMessage>
         </div>
 
 
@@ -406,5 +436,3 @@ export function ProductForm() {
     </Form>
   );
 }
-
-    

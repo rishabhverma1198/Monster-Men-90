@@ -1,7 +1,7 @@
+
 "use client"
 
 import { useState } from "react";
-import { placeholderProducts } from "@/lib/placeholder-data";
 import {
   Card,
   CardContent,
@@ -20,33 +20,97 @@ import {
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import type { Product, ProductVariant } from "@/lib/types";
+import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
+import { collection, doc, getDocs, query, updateDoc, writeBatch } from "firebase/firestore";
+import { useToast } from "@/hooks/use-toast";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 
 interface InventoryItem extends ProductVariant {
+  id: string; // Document ID of the variant
   productId: string;
   productName: string;
   category: string;
 }
 
-export default function InventoryPage() {
-  const [inventory, setInventory] = useState<InventoryItem[]>(
-    placeholderProducts.flatMap(p => 
-      p.variants.map(v => ({
-        ...v,
-        productId: p.id,
-        productName: p.name,
-        category: p.category,
-      }))
-    )
-  );
+function InventoryRowSkeleton() {
+  return (
+    <TableRow>
+      <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+      <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+      <TableCell><Skeleton className="h-4 w-8" /></TableCell>
+      <TableCell className="text-center"><Skeleton className="h-6 w-12 mx-auto" /></TableCell>
+      <TableCell className="text-right"><div className="flex justify-end"><Skeleton className="h-8 w-20" /></div></TableCell>
+    </TableRow>
+  )
+}
 
-  const handleStockChange = (productId: string, size: string, newStock: number) => {
-    // In a real app, this would be a server action to update the database
-    console.log(`Updating stock for ${productId} size ${size} to ${newStock}`);
-    setInventory(prev => prev.map(item => 
-      item.productId === productId && item.size === size 
-      ? { ...item, stock: newStock }
-      : item
-    ));
+export default function InventoryPage() {
+  const { toast } = useToast();
+  const firestore = useFirestore();
+  const { user, isUserLoading } = useUser();
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch all products first
+  const productsQuery = useMemoFirebase(
+    () => (firestore && !isUserLoading ? collection(firestore, 'products') : null),
+    [firestore, isUserLoading]
+  );
+  const { data: products, isLoading: productsLoading } = useCollection<Product>(productsQuery);
+
+  // Then fetch all variants for each product
+  useState(() => {
+    if (products && firestore) {
+      const fetchAllVariants = async () => {
+        setIsLoading(true);
+        const allItems: InventoryItem[] = [];
+        for (const p of products) {
+          const variantsQuery = collection(firestore, 'products', p.id, 'variants');
+          const variantsSnapshot = await getDocs(variantsQuery);
+          variantsSnapshot.forEach(variantDoc => {
+            const variantData = variantDoc.data() as ProductVariant;
+            allItems.push({
+              ...variantData,
+              id: variantDoc.id,
+              productId: p.id,
+              productName: p.name,
+              category: p.category,
+            });
+          });
+        }
+        setInventory(allItems);
+        setIsLoading(false);
+      };
+      fetchAllVariants();
+    } else if (!productsLoading) {
+      setIsLoading(false);
+    }
+  }, [products, firestore, productsLoading]);
+
+
+  const handleStockChange = async (productId: string, variantId: string, newStock: number) => {
+    if (!firestore || newStock < 0) return;
+    
+    const variantRef = doc(firestore, 'products', productId, 'variants', variantId);
+    
+    try {
+      await updateDoc(variantRef, { stock: newStock });
+      setInventory(prev => prev.map(item => 
+        item.id === variantId ? { ...item, stock: newStock } : item
+      ));
+      toast({
+        title: "Stock Updated",
+        description: `Stock for the variant has been updated to ${newStock}.`,
+      });
+    } catch(e) {
+      console.error("Failed to update stock: ", e);
+      toast({
+        title: "Update Failed",
+        description: "Could not update the variant's stock.",
+        variant: "destructive"
+      });
+    }
   };
   
   return (
@@ -72,9 +136,16 @@ export default function InventoryPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {inventory.length > 0 ? (
+              {isLoading || isUserLoading ? (
+                <>
+                  <InventoryRowSkeleton />
+                  <InventoryRowSkeleton />
+                  <InventoryRowSkeleton />
+                  <InventoryRowSkeleton />
+                </>
+              ) : inventory.length > 0 ? (
                 inventory.map((item) => (
-                  <TableRow key={`${item.productId}-${item.size}`}>
+                  <TableRow key={item.id}>
                     <TableCell className="font-medium">{item.productName}</TableCell>
                     <TableCell>
                       <Badge variant="secondary" className="capitalize">{item.category}</Badge>
@@ -85,13 +156,13 @@ export default function InventoryPage() {
                         {item.stock}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell>
                        <div className="flex justify-end items-center gap-2">
                          <Input
                            type="number"
                            defaultValue={item.stock}
                            className="w-20 h-8"
-                           onChange={(e) => handleStockChange(item.productId, item.size, parseInt(e.target.value) || 0)}
+                           onBlur={(e) => handleStockChange(item.productId, item.id, parseInt(e.target.value) || 0)}
                          />
                        </div>
                     </TableCell>
@@ -99,7 +170,7 @@ export default function InventoryPage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center">
+                  <TableCell colSpan={5} className="h-24 text-center">
                     No products found in inventory.
                   </TableCell>
                 </TableRow>

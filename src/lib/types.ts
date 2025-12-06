@@ -1,3 +1,4 @@
+
 import { Timestamp } from "firebase/firestore";
 
 export type ProductVariant = {
@@ -16,8 +17,8 @@ export type Product = {
   price: number;
   tags: string[];
   slug: string;
-  createdAt: Timestamp | Date;
-  updatedAt: Timestamp | Date;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
 };
 
 export type CartItem = {
@@ -35,7 +36,5 @@ export type Order = {
   phone: string;
   items: CartItem[];
   status: 'Pending' | 'Confirmed' | 'Packed' | 'Shipped' | 'Delivered';
-  createdAt: any; // Using `any` for Firebase Timestamp compatibility
+  createdAt: any; // Using `any` for Firebase Timestamp or serialized string
 };
-
-    
