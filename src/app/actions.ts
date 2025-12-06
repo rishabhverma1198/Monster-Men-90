@@ -5,6 +5,7 @@ import type { CartItem, Order } from "@/lib/types";
 import { collection, doc, setDoc, serverTimestamp, getDocs, query, where, Timestamp } from "firebase/firestore";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import { getAuth, signInAnonymously } from "firebase/auth";
 import { firebaseConfig } from "@/firebase/config";
 
 
@@ -17,17 +18,23 @@ interface OrderInput {
 
 // This function needs its own separate Firebase initialization
 // because Server Actions run in a separate environment.
-async function getFirestoreInstance() {
+async function getFirebaseInstances() {
     if (!getApps().length) {
         initializeApp(firebaseConfig);
     }
-    return getFirestore();
+    const db = getFirestore();
+    const auth = getAuth();
+    // Ensure we have an authenticated user for server actions
+    if (!auth.currentUser) {
+        await signInAnonymously(auth);
+    }
+    return { db, auth };
 }
 
 
 export async function createOrder(orderInput: OrderInput): Promise<{ success: boolean; orderId?: string; error?: string }> {
   try {
-    const db = await getFirestoreInstance();
+    const { db } = await getFirebaseInstances();
 
     // 1. Generate a unique Order ID
     const orderId = `MM90-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
@@ -54,7 +61,7 @@ export async function createOrder(orderInput: OrderInput): Promise<{ success: bo
 
 export async function trackOrder(orderId: string, phone: string): Promise<{ success: boolean; order?: Order; error?: string }> {
     try {
-        const db = await getFirestoreInstance();
+        const { db } = await getFirebaseInstances();
         
         const q = query(collection(db, "orders_leads"), where("orderId", "==", orderId), where("phone", "==", phone));
         const querySnapshot = await getDocs(q);
