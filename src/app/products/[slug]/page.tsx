@@ -12,8 +12,8 @@ import { useCart } from "@/context/CartContext";
 import type { Product, ProductVariant } from "@/lib/types";
 import { ShoppingCart, Minus, Plus } from "lucide-react";
 
-export default function ProductPage({ params }: { params: { slug: string } }) {
-  const product = placeholderProducts.find((p) => p.slug === params.slug);
+export default function ProductPage({ params: { slug } }: { params: { slug: string } }) {
+  const product = placeholderProducts.find((p) => p.slug === slug);
   
   const { addToCart } = useCart();
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
