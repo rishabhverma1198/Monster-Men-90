@@ -17,6 +17,8 @@ import { Package2, ShoppingCart, Users, Boxes, Home, LogOut } from "lucide-react
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+
 
 // In a real app, you'd have an authentication wrapper here
 // that redirects unauthenticated users to /admin/login.
@@ -105,12 +107,12 @@ export default function AdminLayout({
           </SidebarFooter>
         </Sidebar>
         <SidebarInset>
-          <div className="p-4 sm:p-6 lg:p-8">
-            <div className="mb-4">
-              <SidebarTrigger className="md:hidden" />
+            <div className="p-4 sm:p-6 lg:p-8">
+              <div className="mb-4">
+                <SidebarTrigger className="md:hidden" />
+              </div>
+              {children}
             </div>
-            {children}
-          </div>
         </SidebarInset>
       </div>
     </SidebarProvider>
