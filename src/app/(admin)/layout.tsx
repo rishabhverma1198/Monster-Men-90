@@ -93,19 +93,17 @@ export default function AdminLayout({
           </SidebarContent>
           <SidebarFooter>
             <Button variant="ghost" className="w-full justify-start text-left" onClick={handleLogout}>
-              <div className="flex w-full items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Avatar className="h-8 w-8">
                     <AvatarImage src="https://picsum.photos/seed/admin/100/100" />
                     <AvatarFallback>AD</AvatarFallback>
                   </Avatar>
-                  <div className="flex flex-col">
+                  <div className="flex flex-col items-start">
                      <span className="text-sm font-semibold">Admin User</span>
                      <span className="text-xs text-muted-foreground">Logout</span>
                   </div>
                 </div>
-                <LogOut className="h-5 w-5" />
-              </div>
+                <LogOut className="h-5 w-5 ml-auto" />
             </Button>
           </SidebarFooter>
         </Sidebar>
