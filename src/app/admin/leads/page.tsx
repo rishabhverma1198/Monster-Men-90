@@ -46,10 +46,9 @@ export default function LeadsPage() {
   const leads = getLeadsFromOrders(placeholderOrders);
 
   return (
-    <div>
-      <div className="flex items-center gap-4 mb-6">
-        <Users className="h-8 w-8 text-accent" />
-        <h1 className="text-3xl font-bold">Handle Leads</h1>
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-4">
+        <h1 className="text-2xl font-semibold">Leads</h1>
       </div>
 
       <Card>

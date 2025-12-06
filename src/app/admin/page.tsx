@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { DollarSign, Package, ShoppingCart, Users, ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
-import { placeholderOrders } from "@/lib/placeholder-data";
+import { placeholderOrders, placeholderProducts } from "@/lib/placeholder-data";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const salesData = [
@@ -22,8 +22,7 @@ export default function AdminDashboard() {
   const recentOrders = placeholderOrders.slice(0, 5);
 
   return (
-    <div className="flex min-h-screen w-full flex-col">
-      <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
+    <div className="flex w-full flex-col gap-4 md:gap-8">
         <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -69,7 +68,7 @@ export default function AdminDashboard() {
               <Package className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">4</div>
+              <div className="text-2xl font-bold">{placeholderProducts.length}</div>
               <p className="text-xs text-muted-foreground">
                 Total products in store
               </p>
@@ -149,7 +148,6 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
         </div>
-      </div>
     </div>
   );
 }

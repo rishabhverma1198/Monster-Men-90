@@ -21,8 +21,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { ShoppingCart } from "lucide-react";
 import type { Order } from "@/lib/types";
 
 const STATUS_CLASSES: Record<Order['status'], string> = {
@@ -41,10 +39,9 @@ export default function OrdersPage() {
   }
 
   return (
-    <div>
-      <div className="flex items-center gap-4 mb-6">
-        <ShoppingCart className="h-8 w-8 text-accent" />
-        <h1 className="text-3xl font-bold">Track Orders</h1>
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-4">
+        <h1 className="text-2xl font-semibold">Orders</h1>
       </div>
 
       <Card>

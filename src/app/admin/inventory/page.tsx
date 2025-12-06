@@ -18,9 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Boxes } from "lucide-react";
 import type { Product, ProductVariant } from "@/lib/types";
 
 interface InventoryItem extends ProductVariant {
@@ -52,10 +50,9 @@ export default function InventoryPage() {
   };
   
   return (
-    <div>
-      <div className="flex items-center gap-4 mb-6">
-        <Boxes className="h-8 w-8 text-accent" />
-        <h1 className="text-3xl font-bold">Inventory Management</h1>
+    <div className="flex flex-col gap-4">
+       <div className="flex items-center gap-4">
+        <h1 className="text-2xl font-semibold">Inventory Management</h1>
       </div>
       
       <Card>
