@@ -1,7 +1,13 @@
+
 "use server";
 
 import type { CartItem, Order } from "@/lib/types";
-import { placeholderOrders, placeholderProducts } from "@/lib/placeholder-data";
+import { collection, doc, setDoc, serverTimestamp, getDocs, query, where } from "firebase/firestore";
+import { getSdks } from "@/firebase";
+import { initializeApp, getApps } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
+import { firebaseConfig } from "@/firebase/config";
+
 
 interface OrderInput {
   name: string;
@@ -10,9 +16,21 @@ interface OrderInput {
   status: Order["status"];
 }
 
+// This function needs its own separate Firebase initialization
+// because Server Actions run in a separate environment.
+async function getFirestoreInstance() {
+    if (!getApps().length) {
+        initializeApp(firebaseConfig);
+    }
+    return getFirestore();
+}
+
+
 // In a real app, this would interact with a database like Firebase Firestore.
 export async function createOrder(orderInput: OrderInput): Promise<{ success: boolean; orderId?: string; error?: string }> {
   try {
+    const db = await getFirestoreInstance();
+
     // 1. Generate a unique Order ID
     const orderId = `MM90-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
@@ -20,11 +38,11 @@ export async function createOrder(orderInput: OrderInput): Promise<{ success: bo
     const newOrder: Order = {
       ...orderInput,
       orderId,
-      createdAt: new Date(), // In Firebase, this would be serverTimestamp()
+      createdAt: serverTimestamp(),
     };
 
-    // 3. "Save" the order (in memory for this placeholder)
-    placeholderOrders.push(newOrder);
+    // 3. "Save" the order to Firestore
+    await setDoc(doc(db, "orders_leads", orderId), newOrder);
 
     // 4. In a real app, you might also want to update product stock here.
     
@@ -40,15 +58,20 @@ export async function createOrder(orderInput: OrderInput): Promise<{ success: bo
 
 export async function trackOrder(orderId: string, phone: string): Promise<{ success: boolean; order?: Order; error?: string }> {
     try {
-        // In a real app, this would be a Firestore query:
-        // const q = query(collection(db, "orders_leads"), where("orderId", "==", orderId), where("phone", "==", phone));
-        // const querySnapshot = await getDocs(q);
+        const db = await getFirestoreInstance();
+        
+        const q = query(collection(db, "orders_leads"), where("orderId", "==", orderId), where("phone", "==", phone));
+        const querySnapshot = await getDocs(q);
 
-        const order = placeholderOrders.find(o => o.orderId.toLowerCase() === orderId.toLowerCase() && o.phone === phone);
-
-        if (order) {
-            // Returning a plain object to avoid serialization issues with dates
-            return { success: true, order: JSON.parse(JSON.stringify(order)) };
+        if (!querySnapshot.empty) {
+            const orderDoc = querySnapshot.docs[0];
+            const order = orderDoc.data() as Order;
+            // Firestore timestamps need to be converted for serialization
+            const serializableOrder = {
+              ...order,
+              createdAt: order.createdAt.toDate().toISOString(),
+            };
+            return { success: true, order: serializableOrder as unknown as Order };
         } else {
             return { success: false, error: "Order not found. Please check your Order ID and Phone Number." };
         }

@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -18,6 +19,7 @@ import {
   Boxes,
   Home,
   LogOut,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -31,6 +33,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useAuth, useUser } from "@/firebase";
+import { useEffect } from "react";
+import { signOut } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { useFirestore } from "@/firebase";
 
 export default function AdminLayout({
   children,
@@ -38,11 +45,41 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const auth = useAuth();
+  const firestore = useFirestore();
+  const { user, isUserLoading } = useUser();
 
-  const handleLogout = () => {
-    console.log("Logging out...");
-    router.push("/");
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.replace("/admin/login");
+    } else if (user && firestore) {
+      const checkAdmin = async () => {
+        const adminDocRef = doc(firestore, "admins", user.uid);
+        const adminDoc = await getDoc(adminDocRef);
+        if (!adminDoc.exists()) {
+          // Not an admin, sign out and redirect
+          await signOut(auth);
+          router.replace("/admin/login?error=not-admin");
+        }
+      };
+      checkAdmin();
+    }
+  }, [user, isUserLoading, router, auth, firestore]);
+
+  const handleLogout = async () => {
+    if (auth) {
+      await signOut(auth);
+      router.push("/admin/login");
+    }
   };
+  
+  if (isUserLoading || !user) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider>
@@ -108,15 +145,17 @@ export default function AdminLayout({
                   <Button variant="ghost" size="icon" className="rounded-full">
                     <Avatar className="h-8 w-8">
                       <AvatarImage
-                        src="https://picsum.photos/seed/admin/100/100"
-                        alt="Admin"
+                        src={user.photoURL || `https://avatar.vercel.sh/${user.uid}.png`}
+                        alt={user.email || "Admin"}
                       />
-                      <AvatarFallback>AD</AvatarFallback>
+                      <AvatarFallback>{user.email?.charAt(0).toUpperCase() || 'A'}</AvatarFallback>
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                   <DropdownMenuSeparator />
+                   <DropdownMenuItem disabled>{user.email}</DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />

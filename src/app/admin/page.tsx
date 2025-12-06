@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button";
 import { DollarSign, Package, ShoppingCart, Users, ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
-import { placeholderOrders, placeholderProducts } from "@/lib/placeholder-data";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection } from "firebase/firestore";
+import type { Order, Product } from "@/lib/types";
 
 const salesData = [
   { name: "Jan", total: Math.floor(Math.random() * 2000) + 500 },
@@ -19,7 +21,26 @@ const salesData = [
 ];
 
 export default function AdminDashboard() {
-  const recentOrders = placeholderOrders.slice(0, 5);
+  const firestore = useFirestore();
+
+  const productsQuery = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'products') : null),
+    [firestore]
+  );
+  const { data: products } = useCollection<Product>(productsQuery);
+
+  const ordersQuery = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'orders_leads') : null),
+    [firestore]
+  );
+  const { data: orders } = useCollection<Order>(ordersQuery);
+
+  const totalRevenue = orders?.reduce((sum, order) => {
+    return sum + order.items.reduce((orderSum, item) => orderSum + (item.price * item.quantity), 0);
+  }, 0) || 0;
+
+  const recentOrders = orders?.slice(0, 5);
+
 
   return (
     <div className="flex w-full flex-col gap-4 md:gap-8">
@@ -32,9 +53,9 @@ export default function AdminDashboard() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">$1,329</div>
+              <div className="text-2xl font-bold">${totalRevenue.toFixed(2)}</div>
               <p className="text-xs text-muted-foreground">
-                +20.1% from last month
+                Based on all orders
               </p>
             </CardContent>
           </Card>
@@ -44,9 +65,9 @@ export default function AdminDashboard() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">+5</div>
+              <div className="text-2xl font-bold">+{orders?.length || 0}</div>
               <p className="text-xs text-muted-foreground">
-                +1 from last month
+                Total leads generated
               </p>
             </CardContent>
           </Card>
@@ -56,9 +77,9 @@ export default function AdminDashboard() {
               <ShoppingCart className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">+12</div>
+              <div className="text-2xl font-bold">+{orders?.length || 0}</div>
               <p className="text-xs text-muted-foreground">
-                +19% from last month
+                Total orders placed
               </p>
             </CardContent>
           </Card>
@@ -68,7 +89,7 @@ export default function AdminDashboard() {
               <Package className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{placeholderProducts.length}</div>
+              <div className="text-2xl font-bold">{products?.length || 0}</div>
               <p className="text-xs text-muted-foreground">
                 Total products in store
               </p>
@@ -122,11 +143,11 @@ export default function AdminDashboard() {
             <CardHeader>
               <CardTitle>Recent Orders</CardTitle>
               <CardDescription>
-                You have {placeholderOrders.length} recent orders.
+                You have {orders?.length || 0} orders in total.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-8">
-              {recentOrders.map(order => (
+              {recentOrders?.map(order => (
                 <div key={order.orderId} className="flex items-center gap-4">
                 <Avatar className="hidden h-9 w-9 sm:flex">
                   <AvatarImage src={`https://avatar.vercel.sh/${order.name}.png`} alt="Avatar" />
