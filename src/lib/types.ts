@@ -1,3 +1,5 @@
+import { Timestamp } from "firebase/firestore";
+
 export type ProductVariant = {
   size: 'S' | 'M' | 'L' | 'XL' | 'XXL';
   stock: number;
@@ -14,8 +16,8 @@ export type Product = {
   tags: string[];
   slug: string;
   variants: ProductVariant[];
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Timestamp | Date;
+  updatedAt: Timestamp | Date;
 };
 
 export type CartItem = {

@@ -1,9 +1,8 @@
 "use client";
 
 import { useSearchParams } from 'next/navigation';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import ProductCard from '@/components/products/ProductCard';
-import { placeholderProducts } from '@/lib/placeholder-data';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,21 +15,58 @@ import {
 import { Slider } from '@/components/ui/slider';
 import { X } from 'lucide-react';
 import type { Product } from '@/lib/types';
+import { useCollection, useFirestore, useAuth, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
+import { initiateAnonymousSignIn } from '@/firebase/non-blocking-login';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const SIZES: Product['variants'][0]['size'][] = ['S', 'M', 'L', 'XL', 'XXL'];
 const CATEGORIES = ['All', 'Men', 'Women', 'Wholesale'];
+
+function ProductsLoadingSkeleton() {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="flex flex-col space-y-3">
+          <Skeleton className="h-[300px] w-full rounded-xl" />
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function ProductsPage() {
   const searchParams = useSearchParams();
   const initialCategory = searchParams.get('category') || 'all';
 
-  const [products] = useState<Product[]>(placeholderProducts);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [priceRange, setPriceRange] = useState([0, 200]);
   const [category, setCategory] = useState(initialCategory);
 
+  const auth = useAuth();
+  const firestore = useFirestore();
+
+  useEffect(() => {
+    if (auth) {
+      initiateAnonymousSignIn(auth);
+    }
+  }, [auth]);
+
+  const productsQuery = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'products') : null),
+    [firestore]
+  );
+  const { data: products, isLoading } = useCollection<Product>(productsQuery);
+
   const filteredProducts = useMemo(() => {
+    if (!products) {
+      return [];
+    }
     return products
       .filter((p) => category === 'all' || p.category === category)
       .filter((p) =>
@@ -137,7 +173,9 @@ export default function ProductsPage() {
 
         {/* Products Grid */}
         <main className="md:col-span-3">
-          {filteredProducts.length > 0 ? (
+          {isLoading ? (
+            <ProductsLoadingSkeleton />
+          ) : filteredProducts.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredProducts.map((product) => (
                 <ProductCard key={product.id} product={product} />
@@ -146,7 +184,7 @@ export default function ProductsPage() {
           ) : (
             <div className="text-center py-20">
               <h2 className="text-2xl font-bold">No Products Found</h2>
-              <p className="text-muted-foreground mt-2">Try adjusting your filters.</p>
+              <p className="text-muted-foreground mt-2">Try adjusting your filters or adding products in the admin panel.</p>
             </div>
           )}
         </main>

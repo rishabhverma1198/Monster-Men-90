@@ -2,7 +2,6 @@
 "use client"
 
 import { useState } from "react";
-import { placeholderProducts } from "@/lib/placeholder-data";
 import Image from 'next/image';
 import { ProductForm } from "@/components/admin/ProductForm";
 import {
@@ -38,10 +37,52 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection } from "firebase/firestore";
+import type { Product } from "@/lib/types";
+import { Skeleton } from "@/components/ui/skeleton";
+
+
+function ProductRowSkeleton() {
+  return (
+    <TableRow>
+      <TableCell className="hidden sm:table-cell">
+        <Skeleton className="aspect-square rounded-md w-16 h-16" />
+      </TableCell>
+      <TableCell>
+        <Skeleton className="h-4 w-32" />
+      </TableCell>
+      <TableCell>
+        <Skeleton className="h-6 w-20" />
+      </TableCell>
+      <TableCell className="hidden md:table-cell">
+        <Skeleton className="h-4 w-16" />
+      </TableCell>
+      <TableCell className="hidden md:table-cell">
+        <Skeleton className="h-4 w-12" />
+      </TableCell>
+      <TableCell className="hidden md:table-cell">
+        <Skeleton className="h-4 w-24" />
+      </TableCell>
+      <TableCell>
+        <Skeleton className="h-8 w-16" />
+      </TableCell>
+    </TableRow>
+  );
+}
+
 
 export default function AdminProductsPage() {
   const [searchTerm, setSearchTerm] = useState("");
-  const filteredProducts = placeholderProducts.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  
+  const firestore = useFirestore();
+  const productsQuery = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'products') : null),
+    [firestore]
+  );
+  const { data: products, isLoading } = useCollection<Product>(productsQuery);
+
+  const filteredProducts = products?.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
     <div className="flex flex-col gap-4">
@@ -132,39 +173,53 @@ export default function AdminProductsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredProducts.map(product => (
-                    <TableRow key={product.id}>
-                      <TableCell className="hidden sm:table-cell">
-                        <Image
-                          alt={product.name}
-                          className="aspect-square rounded-md object-cover"
-                          height="64"
-                          src={product.images[0]}
-                          width="64"
-                        />
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {product.name}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={product.variants.some(v => v.stock > 0) ? "default" : "outline"}>
-                          {product.variants.some(v => v.stock > 0) ? "In Stock" : "Out of Stock"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        ${product.price.toFixed(2)}
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        25
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        {new Date(product.createdAt).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>
-                        <Button size="sm" variant="outline">Edit</Button>
+                  {isLoading ? (
+                    <>
+                      <ProductRowSkeleton />
+                      <ProductRowSkeleton />
+                      <ProductRowSkeleton />
+                    </>
+                  ) : filteredProducts && filteredProducts.length > 0 ? (
+                    filteredProducts.map(product => (
+                      <TableRow key={product.id}>
+                        <TableCell className="hidden sm:table-cell">
+                          <Image
+                            alt={product.name}
+                            className="aspect-square rounded-md object-cover"
+                            height="64"
+                            src={product.images[0]}
+                            width="64"
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {product.name}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={product.variants.some(v => v.stock > 0) ? "default" : "outline"}>
+                            {product.variants.some(v => v.stock > 0) ? "In Stock" : "Out of Stock"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          ${product.price.toFixed(2)}
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          25
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          {product.createdAt ? new Date(product.createdAt).toLocaleDateString() : 'N/A'}
+                        </TableCell>
+                        <TableCell>
+                          <Button size="sm" variant="outline">Edit</Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={7} className="h-24 text-center">
+                        No products found. Add one to get started!
                       </TableCell>
                     </TableRow>
-                  ))}
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
