@@ -1,3 +1,58 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "men-category",
+      "description": "A stylish man posing.",
+      "imageUrl": "https://images.unsplash.com/photo-1624824216985-5639b3071ce6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxzdHlsaXNoJTIwbWFufGVufDB8fHx8MTc2NTAxNTcyOXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "stylish man"
+    },
+    {
+      "id": "women-category",
+      "description": "A stylish woman posing.",
+      "imageUrl": "https://images.unsplash.com/photo-1485462537746-965f33f7f6a7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxzdHlsaXNoJTIwd29tYW58ZW58MHx8fHwxNzY0OTQyNjA1fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "stylish woman"
+    },
+    {
+      "id": "wholesale-category",
+      "description": "A rack of clothes.",
+      "imageUrl": "https://images.unsplash.com/photo-1614990354198-b06764dcb13c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxjbG90aGluZyUyMHJhY2t8ZW58MHx8fHwxNzY1MDE1NzI5fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "clothing rack"
+    },
+    {
+      "id": "men-jacket",
+      "description": "A man wearing a blue denim jacket.",
+      "imageUrl": "https://images.unsplash.com/photo-1756277441804-341ec1e09ea6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxtYW4lMjBkZW5pbXxlbnwwfHx8fDE3NjUwMTU3Mjl8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "man denim"
+    },
+    {
+      "id": "men-jacket-2",
+      "description": "Close up of a blue denim jacket.",
+      "imageUrl": "https://images.unsplash.com/photo-1543076447-215ad9ba6923?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxkZW5pbSUyMGphY2tldHxlbnwwfHx8fDE3NjUwMDc5NzV8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "denim jacket"
+    },
+    {
+      "id": "men-sweater",
+      "description": "A man wearing a striped sweater.",
+      "imageUrl": "https://images.unsplash.com/photo-1755893132452-f0a4d39fa599?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxtYW4lMjBzd2VhdGVyfGVufDB8fHx8MTc2NDk1NDM1OHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "man sweater"
+    },
+    {
+      "id": "women-dress",
+      "description": "A woman in a floral maxi dress.",
+      "imageUrl": "https://images.unsplash.com/photo-1511130558090-00af810c21b1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHx3b21hbiUyMGRyZXNzfGVufDB8fHx8MTc2NDkxNjcwN3ww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "woman dress"
+    },
+    {
+      "id": "women-dress-2",
+      "description": "A woman in a floral maxi dress, different pose.",
+      "imageUrl": "https://images.unsplash.com/photo-1602010069450-0a62034f235c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxmbG9yYWwlMjBkcmVzc3xlbnwwfHx8fDE3NjQ5ODMzNzV8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "floral dress"
+    },
+    {
+      "id": "women-jeans",
+      "description": "A woman wearing high-waisted skinny jeans.",
+      "imageUrl": "https://images.unsplash.com/photo-1598554747436-c9293d6a588f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHx3b21hbiUyMGplYW5zfGVufDB8fHx8MTc2NTAxNTcyOXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "woman jeans"
+    }
+  ]
 }
