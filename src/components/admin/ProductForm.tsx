@@ -24,12 +24,16 @@ import {
 } from "@/components/ui/select";
 import { PlusCircle, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import Image from "next/image";
 
 const variantSchema = z.object({
   size: z.enum(["S", "M", "L", "XL", "XXL"]),
   stock: z.coerce.number().min(0, "Stock cannot be negative."),
   price: z.coerce.number().min(0.01, "Price must be greater than 0."),
 });
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 
 const productFormSchema = z.object({
   name: z.string().min(3, "Product name must be at least 3 characters."),
@@ -38,7 +42,9 @@ const productFormSchema = z.object({
   description: z.string().min(10, "Description must be at least 10 characters."),
   price: z.coerce.number().min(0.01, "Base price must be greater than 0."),
   tags: z.string().min(1, "Please add at least one tag."),
-  images: z.array(z.string().url("Please enter a valid URL.")).min(1, "Please add at least one image URL."),
+  images: z.array(z.any())
+    .min(1, "Please upload at least one image.")
+    .max(5, "You can upload a maximum of 5 images."),
   variants: z.array(variantSchema).min(1, "Please add at least one product variant."),
 });
 
@@ -46,7 +52,7 @@ type ProductFormValues = z.infer<typeof productFormSchema>;
 
 export function ProductForm() {
     const { toast } = useToast();
-  const form = useForm<ProductFormValues>({
+    const form = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
     defaultValues: {
       name: "",
@@ -55,12 +61,12 @@ export function ProductForm() {
       description: "",
       price: 0,
       tags: "",
-      images: [""],
+      images: [],
       variants: [{ size: "M", stock: 10, price: 0 }],
     },
   });
 
-  const { fields: imageFields, append: appendImage, remove: removeImage } = useFieldArray({
+  const { fields: imageFields, append: appendImage, remove: removeImage, update } = useFieldArray({
     control: form.control,
     name: "images",
   });
@@ -70,14 +76,24 @@ export function ProductForm() {
     name: "variants",
   });
 
+  const watchedImages = form.watch("images");
+
   function onSubmit(data: ProductFormValues) {
-    // In a real app, this would be a server action to save the product
-    console.log(data);
+    // In a real app, this is where you would upload files to Firebase Storage
+    // and then save the product data with image URLs to Firestore.
+    console.log("Product data:", data);
+    
+    // Create a new object for display that replaces File objects with their names
+    const displayData = {
+        ...data,
+        images: data.images.map((file: File) => file.name),
+    };
+
     toast({
       title: "Product Submitted!",
       description: (
         <pre className="mt-2 w-[340px] rounded-md bg-slate-950 p-4">
-          <code className="text-white">{JSON.stringify(data, null, 2)}</code>
+          <code className="text-white">{JSON.stringify(displayData, null, 2)}</code>
         </pre>
       ),
     });
@@ -181,37 +197,74 @@ export function ProductForm() {
             />
         </div>
         
-        <div>
-          <FormLabel>Image URLs</FormLabel>
-          <div className="space-y-4 mt-2">
-            {imageFields.map((field, index) => (
-              <FormField
-                key={field.id}
-                control={form.control}
-                name={`images.${index}`}
-                render={({ field }) => (
-                  <FormItem>
-                    <div className="flex items-center gap-2">
-                      <FormControl>
-                        <Input placeholder="https://..." {...field} />
-                      </FormControl>
-                      {imageFields.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => removeImage(index)}><Trash2 className="h-4 w-4 text-destructive"/></Button>}
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            ))}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => appendImage("")}
-            >
-              <PlusCircle className="mr-2 h-4 w-4" /> Add Image URL
-            </Button>
-          </div>
-        </div>
+        <FormField
+          control={form.control}
+          name="images"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Product Images</FormLabel>
+              <FormDescription>Upload 1 to 5 images for your product.</FormDescription>
+              <FormControl>
+                <Input
+                  type="file"
+                  multiple
+                  accept={ACCEPTED_IMAGE_TYPES.join(",")}
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    if(files.length + imageFields.length > 5){
+                        toast({title: "Too many images", description: "You can upload a maximum of 5 images.", variant: "destructive"});
+                        return;
+                    }
+                    files.forEach(file => appendImage(file));
+                  }}
+                  className="hidden"
+                  id="image-upload"
+                />
+              </FormControl>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                  {imageFields.map((field, index) => {
+                    const imageSrc = watchedImages[index] instanceof File ? URL.createObjectURL(watchedImages[index]) : '';
+                    return (
+                      <div key={field.id} className="relative aspect-square border rounded-md">
+                        {imageSrc ? (
+                          <Image
+                            src={imageSrc}
+                            alt={`Preview ${index + 1}`}
+                            fill
+                            className="object-cover rounded-md"
+                          />
+                        ) : (
+                          <div className="flex items-center justify-center h-full text-muted-foreground">No image</div>
+                        )}
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-1 right-1 h-6 w-6"
+                          onClick={() => removeImage(index)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                  {imageFields.length < 5 && (
+                    <Label
+                      htmlFor="image-upload"
+                      className="flex flex-col items-center justify-center w-full aspect-square border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted"
+                    >
+                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                        <PlusCircle className="w-8 h-8 mb-2 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">Add Image</p>
+                      </div>
+                    </Label>
+                  )}
+                </div>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
 
         <div>
             <FormLabel>Variants</FormLabel>
