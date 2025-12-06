@@ -126,7 +126,7 @@ export default function AdminLayout({
               </DropdownMenu>
             </div>
           </header>
-          <main className="p-4 sm:px-6 sm:py-0">{children}</main>
+          <main className="p-4 sm:py-0">{children}</main>
         </SidebarInset>
       </div>
     </SidebarProvider>
