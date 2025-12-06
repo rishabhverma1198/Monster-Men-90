@@ -89,11 +89,13 @@ export default function AdminLayout({
             </div>
           </SidebarFooter>
         </Sidebar>
-        <SidebarInset className="p-4 sm:p-6 lg:p-8">
-          <div className="flex items-center justify-between">
-            <SidebarTrigger className="md:hidden" />
+        <SidebarInset>
+          <div className="p-4 sm:p-6 lg:p-8">
+            <div className="mb-4">
+              <SidebarTrigger className="md:hidden" />
+            </div>
+            {children}
           </div>
-          {children}
         </SidebarInset>
       </div>
     </SidebarProvider>
