@@ -32,9 +32,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-// In a real app, you'd have an authentication wrapper here
-// that redirects unauthenticated users to /admin/login.
-
 export default function AdminLayout({
   children,
 }: {
@@ -43,8 +40,6 @@ export default function AdminLayout({
   const router = useRouter();
 
   const handleLogout = () => {
-    // In a real Firebase app, you would call signOut here
-    // e.g. await auth.signOut();
     console.log("Logging out...");
     router.push("/");
   };
@@ -52,7 +47,7 @@ export default function AdminLayout({
   return (
     <SidebarProvider>
       <div className="flex min-h-screen">
-        <Sidebar>
+        <Sidebar variant="inset" collapsible="icon">
           <SidebarHeader>
             <div className="flex items-center gap-2">
               <Package2 className="h-6 w-6 text-accent" />
