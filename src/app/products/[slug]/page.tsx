@@ -2,6 +2,7 @@
 
 import { notFound } from "next/navigation";
 import { useState } from "react";
+import Link from "next/link";
 import { placeholderProducts } from "@/lib/placeholder-data";
 import { ProductCarousel } from "@/components/products/ProductCarousel";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useCart } from "@/context/CartContext";
 import type { Product, ProductVariant } from "@/lib/types";
-import { ShoppingCart, Minus, Plus } from "lucide-react";
+import { ShoppingCart, Minus, Plus, ArrowLeft } from "lucide-react";
 
 export default function ProductPage({ params: { slug } }: { params: { slug: string } }) {
   const product = placeholderProducts.find((p) => p.slug === slug);
@@ -49,6 +50,12 @@ export default function ProductPage({ params: { slug } }: { params: { slug: stri
 
   return (
     <div className="container mx-auto px-4 py-8">
+       <div className="mb-6">
+          <Link href="/products" className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Products
+          </Link>
+        </div>
       <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
         <div>
           <ProductCarousel images={product.images} productName={product.name} />
