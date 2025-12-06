@@ -1,3 +1,6 @@
+
+"use client";
+
 import {
   SidebarProvider,
   Sidebar,
@@ -8,11 +11,27 @@ import {
   SidebarMenuButton,
   SidebarInset,
   SidebarTrigger,
-  SidebarFooter,
 } from "@/components/ui/sidebar";
-import { Package2, ShoppingCart, Users, Boxes, LineChart, Home } from "lucide-react";
+import {
+  Package2,
+  ShoppingCart,
+  Users,
+  Boxes,
+  Home,
+  LogOut,
+} from "lucide-react";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // In a real app, you'd have an authentication wrapper here
 // that redirects unauthenticated users to /admin/login.
@@ -22,6 +41,15 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const router = useRouter();
+
+  const handleLogout = () => {
+    // In a real Firebase app, you would call signOut here
+    // e.g. await auth.signOut();
+    console.log("Logging out...");
+    router.push("/admin/login");
+  };
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen">
@@ -76,26 +104,35 @@ export default function AdminLayout({
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarContent>
-          <SidebarFooter>
-            <div className="flex items-center gap-2">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src="https://picsum.photos/seed/admin/100/100" />
-                <AvatarFallback>AD</AvatarFallback>
-              </Avatar>
-              <div className="flex flex-col">
-                <span className="text-sm font-semibold">Admin User</span>
-                <span className="text-xs text-muted-foreground">Logout</span>
-              </div>
-            </div>
-          </SidebarFooter>
         </Sidebar>
         <SidebarInset>
-          <div className="p-4 sm:p-6 lg:p-8">
-            <div className="mb-4">
-              <SidebarTrigger className="md:hidden" />
+          <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
+            <SidebarTrigger className="md:hidden" />
+            <div className="relative ml-auto flex-1 md:grow-0">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="rounded-full">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage
+                        src="https://picsum.photos/seed/admin/100/100"
+                        alt="Admin"
+                      />
+                      <AvatarFallback>AD</AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Logout</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
-            {children}
-          </div>
+          </header>
+          <main className="p-4 sm:px-6 sm:py-0">{children}</main>
         </SidebarInset>
       </div>
     </SidebarProvider>
