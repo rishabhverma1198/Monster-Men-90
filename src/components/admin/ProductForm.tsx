@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useForm, useFieldArray } from "react-hook-form";
@@ -26,6 +27,7 @@ import {
 import { PlusCircle, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Image from "next/image";
+import { useState, useEffect } from "react";
 
 const variantSchema = z.object({
   size: z.enum(["S", "M", "L", "XL", "XXL"]),
@@ -53,6 +55,12 @@ type ProductFormValues = z.infer<typeof productFormSchema>;
 
 export function ProductForm() {
     const { toast } = useToast();
+    const [isMounted, setIsMounted] = useState(false);
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
     const form = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
     defaultValues: {
@@ -223,7 +231,7 @@ export function ProductForm() {
                 />
               </FormControl>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                  {imageFields.map((field, index) => {
+                  {isMounted && imageFields.map((field, index) => {
                     const imageSrc = watchedImages[index] instanceof File ? URL.createObjectURL(watchedImages[index]) : '';
                     return (
                       <div key={field.id} className="relative aspect-square border rounded-md">
@@ -233,6 +241,7 @@ export function ProductForm() {
                             alt={`Preview ${index + 1}`}
                             fill
                             className="object-cover rounded-md"
+                            onLoad={() => URL.revokeObjectURL(imageSrc)}
                           />
                         ) : (
                           <div className="flex items-center justify-center h-full text-muted-foreground">No image</div>
@@ -339,3 +348,5 @@ export function ProductForm() {
     </Form>
   );
 }
+
+    
