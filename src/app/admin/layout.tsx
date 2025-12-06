@@ -1,4 +1,3 @@
-
 "use client";
 
 import {
@@ -47,7 +46,7 @@ export default function AdminLayout({
     // In a real Firebase app, you would call signOut here
     // e.g. await auth.signOut();
     console.log("Logging out...");
-    router.push("/admin/login");
+    router.push("/");
   };
 
   return (
