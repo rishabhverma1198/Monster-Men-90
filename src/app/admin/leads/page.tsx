@@ -1,4 +1,5 @@
-import { placeholderOrders } from "@/lib/placeholder-data";
+"use client";
+
 import {
   Card,
   CardContent,
@@ -16,17 +17,28 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Users, Phone, Ban, CheckCircle } from "lucide-react";
+import { Phone, Ban, CheckCircle } from "lucide-react";
 import type { Order } from "@/lib/types";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection } from "firebase/firestore";
+import { Skeleton } from "@/components/ui/skeleton";
+
+interface Lead {
+    name: string;
+    phone: string;
+    orderIds: string[];
+    totalSpent: number;
+}
 
 // In a real app, this data would be derived and aggregated from the orders collection.
-const getLeadsFromOrders = (orders: Order[]) => {
-  const leadsMap = new Map<string, { name: string; phone: string; orderIds: string[]; totalSpent: number }>();
+const getLeadsFromOrders = (orders: Order[] | null): Lead[] => {
+  if (!orders) return [];
+  const leadsMap = new Map<string, Lead>();
 
   orders.forEach(order => {
     const total = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    if (leadsMap.has(order.phone)) {
-      const existingLead = leadsMap.get(order.phone)!;
+    const existingLead = leadsMap.get(order.phone);
+    if (existingLead) {
       existingLead.orderIds.push(order.orderId);
       existingLead.totalSpent += total;
     } else {
@@ -42,8 +54,26 @@ const getLeadsFromOrders = (orders: Order[]) => {
   return Array.from(leadsMap.values());
 };
 
+function LeadRowSkeleton() {
+    return (
+        <TableRow>
+            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+            <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+            <TableCell className="text-center"><Skeleton className="h-6 w-8 mx-auto" /></TableCell>
+            <TableCell className="text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
+            <TableCell className="text-center"><div className="flex justify-center gap-2"><Skeleton className="h-8 w-24" /><Skeleton className="h-8 w-24" /></div></TableCell>
+        </TableRow>
+    )
+}
+
 export default function LeadsPage() {
-  const leads = getLeadsFromOrders(placeholderOrders);
+  const firestore = useFirestore();
+  const ordersQuery = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'orders_leads') : null),
+    [firestore]
+  );
+  const { data: orders, isLoading } = useCollection<Order>(ordersQuery);
+  const leads = getLeadsFromOrders(orders);
 
   return (
     <div className="flex flex-col gap-4">
@@ -70,7 +100,13 @@ export default function LeadsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {leads.length > 0 ? (
+              {isLoading ? (
+                <>
+                    <LeadRowSkeleton />
+                    <LeadRowSkeleton />
+                    <LeadRowSkeleton />
+                </>
+              ) : leads.length > 0 ? (
                 leads.map((lead) => (
                   <TableRow key={lead.phone}>
                     <TableCell className="font-medium">{lead.name}</TableCell>
