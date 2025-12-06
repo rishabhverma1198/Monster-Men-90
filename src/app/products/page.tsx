@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useSearchParams } from 'next/navigation';
@@ -16,7 +17,7 @@ import { Slider } from '@/components/ui/slider';
 import { X } from 'lucide-react';
 import type { Product, ProductVariant } from '@/lib/types';
 import { useCollection, useFirestore, useAuth, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { initiateAnonymousSignIn } from '@/firebase/non-blocking-login';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -61,28 +62,7 @@ export default function ProductsPage() {
     () => (firestore ? collection(firestore, 'products') : null),
     [firestore]
   );
-  const { data: products, isLoading } = useCollection<Product>(productsQuery);
-
-  const filteredProducts = useMemo(() => {
-    if (!products) {
-      return [];
-    }
-    return products
-      .filter((p) => category === 'all' || p.category === category)
-      .filter((p) =>
-        searchTerm
-          ? p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            p.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
-          : true
-      )
-      .filter((p) =>
-        selectedSizes.length > 0
-          ? true // Will filter based on subcollection data below
-          : true
-      )
-      .filter(p => p.price >= priceRange[0] && p.price <= priceRange[1]);
-  }, [products, category, searchTerm, selectedSizes, priceRange]);
-
+  
   const toggleSize = (size: string) => {
     setSelectedSizes((prev) =>
       prev.includes(size) ? prev.filter((s) => s !== size) : [...prev, size]
@@ -98,33 +78,39 @@ export default function ProductsPage() {
 
   // A new component to handle filtering based on variants subcollection
   function FilteredProductGrid() {
-    const { data: allProducts, isLoading } = useCollection<Product>(productsQuery);
-
+    const { data: products, isLoading } = useCollection<Product>(productsQuery);
     const [filteredProductIds, setFilteredProductIds] = useState<string[] | null>(null);
+    const [isSizeFilterLoading, setSizeFilterLoading] = useState(false);
 
     useEffect(() => {
-      if (!allProducts || !firestore || selectedSizes.length === 0) {
-        setFilteredProductIds(null); // No size filter applied
+      if (!products || !firestore) {
+        return;
+      }
+      if (selectedSizes.length === 0) {
+        setFilteredProductIds(null);
         return;
       }
 
       const findProductsWithSizes = async () => {
+        setSizeFilterLoading(true);
         const matchingIds = new Set<string>();
-        for (const p of allProducts) {
-          const variantsRef = collection(firestore, 'products', p.id, 'variants');
-          const { data: variants } = await new Promise<any>(resolve => {
-            const { data, isLoading } = useCollection(variantsRef);
-            if (!isLoading) resolve({data, isLoading});
-          });
-          if (variants && variants.some((v: ProductVariant) => selectedSizes.includes(v.size) && v.stock > 0)) {
-            matchingIds.add(p.id);
-          }
+        for (const p of products) {
+            const variantsQuery = query(
+                collection(firestore, 'products', p.id, 'variants'),
+                where('size', 'in', selectedSizes),
+                where('stock', '>', 0)
+            );
+            const variantsSnapshot = await getDocs(variantsQuery);
+            if (!variantsSnapshot.empty) {
+                matchingIds.add(p.id);
+            }
         }
         setFilteredProductIds(Array.from(matchingIds));
+        setSizeFilterLoading(false);
       };
 
       findProductsWithSizes();
-    }, [allProducts, firestore, selectedSizes]);
+    }, [products, firestore, selectedSizes]);
 
 
     const finalProducts = useMemo(() => {
@@ -142,7 +128,7 @@ export default function ProductsPage() {
 
     }, [products, category, searchTerm, priceRange, filteredProductIds]);
 
-    if (isLoading) {
+    if (isLoading || isSizeFilterLoading) {
       return <ProductsLoadingSkeleton />;
     }
     
@@ -245,5 +231,3 @@ export default function ProductsPage() {
     </div>
   );
 }
-
-    

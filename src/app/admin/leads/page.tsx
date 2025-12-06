@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -19,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Phone, Ban, CheckCircle } from "lucide-react";
 import type { Order } from "@/lib/types";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -68,9 +69,10 @@ function LeadRowSkeleton() {
 
 export default function LeadsPage() {
   const firestore = useFirestore();
+  const { isUserLoading } = useUser();
   const ordersQuery = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'orders_leads') : null),
-    [firestore]
+    () => (firestore && !isUserLoading ? collection(firestore, 'orders_leads') : null),
+    [firestore, isUserLoading]
   );
   const { data: orders, isLoading } = useCollection<Order>(ordersQuery);
   const leads = getLeadsFromOrders(orders);
@@ -100,7 +102,7 @@ export default function LeadsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
+              {isLoading || isUserLoading ? (
                 <>
                     <LeadRowSkeleton />
                     <LeadRowSkeleton />

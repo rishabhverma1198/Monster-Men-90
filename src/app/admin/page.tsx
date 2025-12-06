@@ -7,9 +7,10 @@ import { DollarSign, Package, ShoppingCart, Users, ArrowUpRight } from "lucide-r
 import Link from "next/link";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection } from "firebase/firestore";
+import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
+import { collection, query, orderBy, limit } from "firebase/firestore";
 import type { Order, Product } from "@/lib/types";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const salesData = [
   { name: "Jan", total: Math.floor(Math.random() * 2000) + 500 },
@@ -20,83 +21,116 @@ const salesData = [
   { name: "Jun", total: 2730 },
 ];
 
+function StatCardSkeleton() {
+    return (
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-4 w-4" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-7 w-20" />
+              <Skeleton className="h-3 w-32 mt-2" />
+            </CardContent>
+        </Card>
+    )
+}
+
 export default function AdminDashboard() {
   const firestore = useFirestore();
+  const { user, isUserLoading } = useUser();
 
   const productsQuery = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'products') : null),
-    [firestore]
+    () => (firestore && !isUserLoading ? collection(firestore, 'products') : null),
+    [firestore, isUserLoading]
   );
-  const { data: products } = useCollection<Product>(productsQuery);
+  const { data: products, isLoading: productsLoading } = useCollection<Product>(productsQuery);
 
   const ordersQuery = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'orders_leads') : null),
-    [firestore]
+    () => (firestore && !isUserLoading ? collection(firestore, 'orders_leads') : null),
+    [firestore, isUserLoading]
   );
-  const { data: orders } = useCollection<Order>(ordersQuery);
+  const { data: orders, isLoading: ordersLoading } = useCollection<Order>(ordersQuery);
+
+  const recentOrdersQuery = useMemoFirebase(
+    () => (firestore && !isUserLoading ? query(collection(firestore, 'orders_leads'), orderBy('createdAt', 'desc'), limit(5)) : null),
+    [firestore, isUserLoading]
+  );
+  const { data: recentOrders, isLoading: recentOrdersLoading } = useCollection<Order>(recentOrdersQuery);
+
 
   const totalRevenue = orders
     ? orders.reduce((sum, order) => {
         return sum + order.items.reduce((orderSum, item) => orderSum + (item.price * item.quantity), 0);
       }, 0)
     : 0;
-
-  const recentOrders = orders ? orders.slice(0, 5) : [];
-
+    
+  const isLoading = productsLoading || ordersLoading || recentOrdersLoading;
 
   return (
     <div className="flex w-full flex-col gap-4 md:gap-8">
         <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Total Revenue
-              </CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">${totalRevenue.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground">
-                Based on all orders
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">New Leads</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">+{orders?.length || 0}</div>
-              <p className="text-xs text-muted-foreground">
-                Total leads generated
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">+{orders?.length || 0}</div>
-              <p className="text-xs text-muted-foreground">
-                Total orders placed
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Products</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{products?.length || 0}</div>
-              <p className="text-xs text-muted-foreground">
-                Total products in store
-              </p>
-            </CardContent>
-          </Card>
+          {isLoading ? (
+            <>
+                <StatCardSkeleton />
+                <StatCardSkeleton />
+                <StatCardSkeleton />
+                <StatCardSkeleton />
+            </>
+          ) : (
+          <>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Total Revenue
+                </CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">${totalRevenue.toFixed(2)}</div>
+                <p className="text-xs text-muted-foreground">
+                  Based on all orders
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">New Leads</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">+{orders?.length || 0}</div>
+                <p className="text-xs text-muted-foreground">
+                  Total leads generated
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
+                <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">+{orders?.length || 0}</div>
+                <p className="text-xs text-muted-foreground">
+                  Total orders placed
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Products</CardTitle>
+                <Package className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{products?.length || 0}</div>
+                <p className="text-xs text-muted-foreground">
+                  Total products in store
+                </p>
+              </CardContent>
+            </Card>
+          </>
+          )}
         </div>
         <div className="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-3">
           <Card className="xl:col-span-2">
@@ -149,7 +183,26 @@ export default function AdminDashboard() {
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-8">
-              {recentOrders?.map(order => (
+              {recentOrdersLoading ? (
+                <>
+                 <div className="flex items-center gap-4">
+                    <Skeleton className="h-9 w-9 rounded-full" />
+                    <div className="grid gap-1 flex-grow">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-3 w-32" />
+                    </div>
+                    <Skeleton className="h-5 w-16" />
+                 </div>
+                 <div className="flex items-center gap-4">
+                    <Skeleton className="h-9 w-9 rounded-full" />
+                    <div className="grid gap-1 flex-grow">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-3 w-32" />
+                    </div>
+                    <Skeleton className="h-5 w-16" />
+                 </div>
+                </>
+              ) : recentOrders?.map(order => (
                 <div key={order.orderId} className="flex items-center gap-4">
                 <Avatar className="hidden h-9 w-9 sm:flex">
                   <AvatarImage src={`https://avatar.vercel.sh/${order.name}.png`} alt="Avatar" />

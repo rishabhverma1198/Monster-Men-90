@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Order } from "@/lib/types";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, updateDoc } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -52,10 +52,11 @@ function OrderRowSkeleton() {
 
 export default function OrdersPage() {
   const firestore = useFirestore();
+  const { isUserLoading } = useUser();
   const { toast } = useToast();
   const ordersQuery = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'orders_leads') : null),
-    [firestore]
+    () => (firestore && !isUserLoading ? collection(firestore, 'orders_leads') : null),
+    [firestore, isUserLoading]
   );
   const { data: orders, isLoading } = useCollection<Order>(ordersQuery);
 
@@ -108,7 +109,7 @@ export default function OrdersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
+              {isLoading || isUserLoading ? (
                 <>
                   <OrderRowSkeleton />
                   <OrderRowSkeleton />
