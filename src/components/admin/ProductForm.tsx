@@ -24,10 +24,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PlusCircle, Trash2 } from "lucide-react";
+import { Loader2, PlusCircle, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Image from "next/image";
 import { useState, useEffect } from "react";
+import { useFirestore } from "@/firebase";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { collection, doc, writeBatch, serverTimestamp } from "firebase/firestore";
 
 const variantSchema = z.object({
   size: z.enum(["S", "M", "L", "XL", "XXL"]),
@@ -45,7 +48,7 @@ const productFormSchema = z.object({
   description: z.string().min(10, "Description must be at least 10 characters."),
   price: z.coerce.number().min(0.01, "Base price must be greater than 0."),
   tags: z.string().min(1, "Please add at least one tag."),
-  images: z.array(z.any())
+  images: z.array(z.instanceof(File))
     .min(1, "Please upload at least one image.")
     .max(5, "You can upload a maximum of 5 images."),
   variants: z.array(variantSchema).min(1, "Please add at least one product variant."),
@@ -56,6 +59,8 @@ type ProductFormValues = z.infer<typeof productFormSchema>;
 export function ProductForm() {
     const { toast } = useToast();
     const [isMounted, setIsMounted] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const firestore = useFirestore();
 
     useEffect(() => {
         setIsMounted(true);
@@ -87,26 +92,72 @@ export function ProductForm() {
 
   const watchedImages = form.watch("images");
 
-  function onSubmit(data: ProductFormValues) {
-    // In a real app, this is where you would upload files to Firebase Storage
-    // and then save the product data with image URLs to Firestore.
-    console.log("Product data:", data);
-    
-    // Create a new object for display that replaces File objects with their names
-    const displayData = {
-        ...data,
-        images: data.images.map((file: File) => file.name),
-    };
+  async function onSubmit(data: ProductFormValues) {
+    if (!firestore) {
+        toast({ title: "Error", description: "Database not available.", variant: "destructive" });
+        return;
+    }
 
-    toast({
-      title: "Product Submitted!",
-      description: (
-        <pre className="mt-2 w-[340px] rounded-md bg-slate-950 p-4">
-          <code className="text-white">{JSON.stringify(displayData, null, 2)}</code>
-        </pre>
-      ),
-    });
-    form.reset();
+    setIsSubmitting(true);
+    const storage = getStorage();
+
+    try {
+        // 1. Upload images to Firebase Storage and get URLs
+        const imageUrls: string[] = [];
+        for (const imageFile of data.images) {
+            const storageRef = ref(storage, `products/${Date.now()}-${imageFile.name}`);
+            const snapshot = await uploadBytes(storageRef, imageFile);
+            const downloadURL = await getDownloadURL(snapshot.ref);
+            imageUrls.push(downloadURL);
+        }
+
+        // 2. Prepare product and variant data for Firestore
+        const productsRef = collection(firestore, "products");
+        const newProductRef = doc(productsRef); // Auto-generate ID
+
+        const batch = writeBatch(firestore);
+
+        // 3. Set the main product document
+        batch.set(newProductRef, {
+            id: newProductRef.id,
+            name: data.name,
+            slug: data.slug,
+            category: data.category,
+            description: data.description,
+            price: data.price,
+            tags: data.tags.split(",").map(tag => tag.trim()),
+            images: imageUrls,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+        });
+
+        // 4. Set the variant documents in the subcollection
+        data.variants.forEach(variant => {
+            const variantRef = doc(collection(newProductRef, "variants"));
+            batch.set(variantRef, {
+              ...variant,
+              productId: newProductRef.id
+            });
+        });
+
+        // 5. Commit the batch
+        await batch.commit();
+
+        toast({
+            title: "Product Added!",
+            description: `${data.name} has been successfully added to your store.`,
+        });
+        form.reset();
+    } catch (error) {
+        console.error("Error adding product:", error);
+        toast({
+            title: "Error",
+            description: "Failed to add product. Please try again.",
+            variant: "destructive"
+        });
+    } finally {
+        setIsSubmitting(false);
+    }
   }
 
   return (
@@ -209,7 +260,7 @@ export function ProductForm() {
         <FormField
           control={form.control}
           name="images"
-          render={({ field }) => (
+          render={() => (
             <FormItem>
               <FormLabel>Product Images</FormLabel>
               <FormDescription>Upload 1 to 5 images for your product.</FormDescription>
@@ -228,6 +279,7 @@ export function ProductForm() {
                   }}
                   className="hidden"
                   id="image-upload"
+                  disabled={isSubmitting}
                 />
               </FormControl>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -252,6 +304,7 @@ export function ProductForm() {
                           size="icon"
                           className="absolute top-1 right-1 h-6 w-6"
                           onClick={() => removeImage(index)}
+                          disabled={isSubmitting}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -261,7 +314,7 @@ export function ProductForm() {
                   {imageFields.length < 5 && (
                     <Label
                       htmlFor="image-upload"
-                      className="flex flex-col items-center justify-center w-full aspect-square border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted"
+                      className={`flex flex-col items-center justify-center w-full aspect-square border-2 border-dashed rounded-lg ${isSubmitting ? 'cursor-not-allowed bg-muted/50' : 'cursor-pointer hover:bg-muted'}`}
                     >
                       <div className="flex flex-col items-center justify-center pt-5 pb-6">
                         <PlusCircle className="w-8 h-8 mb-2 text-muted-foreground" />
@@ -287,7 +340,7 @@ export function ProductForm() {
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel className="text-xs">Size</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
                                         <FormControl>
                                             <SelectTrigger><SelectValue /></SelectTrigger>
                                         </FormControl>
@@ -306,7 +359,7 @@ export function ProductForm() {
                                 <FormItem>
                                     <FormLabel className="text-xs">Stock</FormLabel>
                                     <FormControl>
-                                        <Input type="number" {...field} />
+                                        <Input type="number" {...field} disabled={isSubmitting}/>
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -319,14 +372,14 @@ export function ProductForm() {
                                 <FormItem>
                                     <FormLabel className="text-xs">Price ($)</FormLabel>
                                     <FormControl>
-                                        <Input type="number" step="0.01" {...field} />
+                                        <Input type="number" step="0.01" {...field} disabled={isSubmitting}/>
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}
                         />
                         <div className="flex items-end h-full">
-                         {variantFields.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => removeVariant(index)}><Trash2 className="h-4 w-4 text-destructive"/></Button>}
+                         {variantFields.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => removeVariant(index)} disabled={isSubmitting}><Trash2 className="h-4 w-4 text-destructive"/></Button>}
                         </div>
                     </div>
                 ))}
@@ -336,14 +389,19 @@ export function ProductForm() {
                     size="sm"
                     className="mt-4"
                     onClick={() => appendVariant({ size: "M", stock: 10, price: form.getValues("price") })}
+                    disabled={isSubmitting}
                     >
                     <PlusCircle className="mr-2 h-4 w-4" /> Add Variant
                 </Button>
             </div>
+             <FormMessage>{form.formState.errors.variants?.message}</FormMessage>
         </div>
 
 
-        <Button type="submit" size="lg" className="bg-accent hover:bg-accent/90">Add Product</Button>
+        <Button type="submit" size="lg" className="bg-accent hover:bg-accent/90" disabled={isSubmitting}>
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isSubmitting ? "Adding Product..." : "Add Product"}
+        </Button>
       </form>
     </Form>
   );

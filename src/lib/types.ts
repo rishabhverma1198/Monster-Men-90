@@ -1,6 +1,7 @@
 import { Timestamp } from "firebase/firestore";
 
 export type ProductVariant = {
+  productId: string;
   size: 'S' | 'M' | 'L' | 'XL' | 'XXL';
   stock: number;
   price: number;
@@ -15,7 +16,6 @@ export type Product = {
   price: number;
   tags: string[];
   slug: string;
-  variants: ProductVariant[];
   createdAt: Timestamp | Date;
   updatedAt: Timestamp | Date;
 };
@@ -37,3 +37,5 @@ export type Order = {
   status: 'Pending' | 'Confirmed' | 'Packed' | 'Shipped' | 'Delivered';
   createdAt: any; // Using `any` for Firebase Timestamp compatibility
 };
+
+    

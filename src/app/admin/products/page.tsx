@@ -27,20 +27,33 @@ import {
 } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { File, ListFilter, PlusCircle, Search } from "lucide-react";
+import { File, ListFilter, MoreHorizontal, PlusCircle, Search, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection } from "firebase/firestore";
-import type { Product } from "@/lib/types";
+import { collection, deleteDoc, doc, getDocs, writeBatch } from "firebase/firestore";
+import type { Product, ProductVariant } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { getStorage, ref, deleteObject } from "firebase/storage";
 
 
 function ProductRowSkeleton() {
@@ -59,13 +72,10 @@ function ProductRowSkeleton() {
         <Skeleton className="h-4 w-16" />
       </TableCell>
       <TableCell className="hidden md:table-cell">
-        <Skeleton className="h-4 w-12" />
-      </TableCell>
-      <TableCell className="hidden md:table-cell">
         <Skeleton className="h-4 w-24" />
       </TableCell>
       <TableCell>
-        <Skeleton className="h-8 w-16" />
+        <Skeleton className="h-8 w-8" />
       </TableCell>
     </TableRow>
   );
@@ -74,6 +84,7 @@ function ProductRowSkeleton() {
 
 export default function AdminProductsPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const { toast } = useToast();
   
   const firestore = useFirestore();
   const productsQuery = useMemoFirebase(
@@ -82,9 +93,60 @@ export default function AdminProductsPage() {
   );
   const { data: products, isLoading } = useCollection<Product>(productsQuery);
 
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+
   const filteredProducts = products?.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
+  const handleDeleteProduct = async () => {
+    if (!productToDelete || !firestore) {
+      toast({ title: "Error", description: "Product not selected or database not available.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      // 1. Delete variants subcollection
+      const variantsRef = collection(firestore, 'products', productToDelete.id, 'variants');
+      const variantsSnapshot = await getDocs(variantsRef);
+      const batch = writeBatch(firestore);
+      variantsSnapshot.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+      await batch.commit();
+
+      // 2. Delete images from Firebase Storage
+      const storage = getStorage();
+      for (const imageUrl of productToDelete.images) {
+        try {
+          const imageRef = ref(storage, imageUrl);
+          await deleteObject(imageRef);
+        } catch (storageError: any) {
+          // Log if image deletion fails but don't block product deletion
+          console.warn(`Could not delete image ${imageUrl}:`, storageError);
+        }
+      }
+
+      // 3. Delete the product document
+      await deleteDoc(doc(firestore, 'products', productToDelete.id));
+
+      toast({
+        title: "Product Deleted",
+        description: `"${productToDelete.name}" has been successfully deleted.`,
+      });
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete the product. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setProductToDelete(null);
+    }
+  };
+
+
   return (
+    <>
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Products</h1>
@@ -96,37 +158,10 @@ export default function AdminProductsPage() {
             <TabsTrigger value="new">Add New</TabsTrigger>
           </TabsList>
           <div className="ml-auto flex items-center gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8 gap-1">
-                  <ListFilter className="h-3.5 w-3.5" />
-                  <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                    Filter
-                  </span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Filter by</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuCheckboxItem checked>
-                  Active
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem>Draft</DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem>
-                  Archived
-                </DropdownMenuCheckboxItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
             <Button size="sm" variant="outline" className="h-8 gap-1">
               <File className="h-3.5 w-3.5" />
               <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
                 Export
-              </span>
-            </Button>
-            <Button size="sm" className="h-8 gap-1">
-              <PlusCircle className="h-3.5 w-3.5" />
-              <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                Add Product
               </span>
             </Button>
           </div>
@@ -162,9 +197,6 @@ export default function AdminProductsPage() {
                       Price
                     </TableHead>
                     <TableHead className="hidden md:table-cell">
-                      Total Sales
-                    </TableHead>
-                    <TableHead className="hidden md:table-cell">
                       Created at
                     </TableHead>
                     <TableHead>
@@ -180,7 +212,12 @@ export default function AdminProductsPage() {
                       <ProductRowSkeleton />
                     </>
                   ) : filteredProducts && filteredProducts.length > 0 ? (
-                    filteredProducts.map(product => (
+                    filteredProducts.map(product => {
+                      const variantsCollection = useMemoFirebase(() => (firestore ? collection(firestore, 'products', product.id, 'variants') : null), [firestore, product.id]);
+                      const { data: variants } = useCollection<ProductVariant>(variantsCollection);
+                      const hasStock = variants ? variants.some(v => v.stock > 0) : false;
+
+                      return (
                       <TableRow key={product.id}>
                         <TableCell className="hidden sm:table-cell">
                           <Image
@@ -195,27 +232,42 @@ export default function AdminProductsPage() {
                           {product.name}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={product.variants.some(v => v.stock > 0) ? "default" : "outline"}>
-                            {product.variants.some(v => v.stock > 0) ? "In Stock" : "Out of Stock"}
+                           <Badge variant={hasStock ? "default" : "outline"}>
+                            {hasStock ? "In Stock" : "Out of Stock"}
                           </Badge>
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
                           ${product.price.toFixed(2)}
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
-                          25
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          {product.createdAt ? new Date(product.createdAt).toLocaleDateString() : 'N/A'}
+                          {product.createdAt ? new Date(product.createdAt.toDate()).toLocaleDateString() : 'N/A'}
                         </TableCell>
                         <TableCell>
-                          <Button size="sm" variant="outline">Edit</Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button aria-haspopup="true" size="icon" variant="ghost">
+                                <MoreHorizontal className="h-4 w-4" />
+                                <span className="sr-only">Toggle menu</span>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuItem>Edit</DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-destructive focus:bg-destructive focus:text-destructive-foreground"
+                                onClick={() => setProductToDelete(product)}
+                              >
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
-                    ))
+                      );
+                    })
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={7} className="h-24 text-center">
+                      <TableCell colSpan={6} className="h-24 text-center">
                         No products found. Add one to get started!
                       </TableCell>
                     </TableRow>
@@ -240,5 +292,28 @@ export default function AdminProductsPage() {
         </TabsContent>
       </Tabs>
     </div>
+     <AlertDialog open={!!productToDelete} onOpenChange={(open) => !open && setProductToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the product
+              "{productToDelete?.name}" and all its data from our servers.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteProduct}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
+
+    

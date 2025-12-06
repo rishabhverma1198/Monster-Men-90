@@ -14,13 +14,13 @@ import {
 } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { X } from 'lucide-react';
-import type { Product } from '@/lib/types';
+import type { Product, ProductVariant } from '@/lib/types';
 import { useCollection, useFirestore, useAuth, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
 import { initiateAnonymousSignIn } from '@/firebase/non-blocking-login';
 import { Skeleton } from '@/components/ui/skeleton';
 
-const SIZES: Product['variants'][0]['size'][] = ['S', 'M', 'L', 'XL', 'XXL'];
+const SIZES: ProductVariant['size'][] = ['S', 'M', 'L', 'XL', 'XXL'];
 const CATEGORIES = ['All', 'Men', 'Women', 'Wholesale'];
 
 function ProductsLoadingSkeleton() {
@@ -77,9 +77,7 @@ export default function ProductsPage() {
       )
       .filter((p) =>
         selectedSizes.length > 0
-          ? p.variants.some(
-              (v) => selectedSizes.includes(v.size) && v.stock > 0
-            )
+          ? true // Will filter based on subcollection data below
           : true
       )
       .filter(p => p.price >= priceRange[0] && p.price <= priceRange[1]);
@@ -96,6 +94,74 @@ export default function ProductsPage() {
     setSelectedSizes([]);
     setPriceRange([0, 200]);
     setCategory('all');
+  }
+
+  // A new component to handle filtering based on variants subcollection
+  function FilteredProductGrid() {
+    const { data: allProducts, isLoading } = useCollection<Product>(productsQuery);
+
+    const [filteredProductIds, setFilteredProductIds] = useState<string[] | null>(null);
+
+    useEffect(() => {
+      if (!allProducts || !firestore || selectedSizes.length === 0) {
+        setFilteredProductIds(null); // No size filter applied
+        return;
+      }
+
+      const findProductsWithSizes = async () => {
+        const matchingIds = new Set<string>();
+        for (const p of allProducts) {
+          const variantsRef = collection(firestore, 'products', p.id, 'variants');
+          const { data: variants } = await new Promise<any>(resolve => {
+            const { data, isLoading } = useCollection(variantsRef);
+            if (!isLoading) resolve({data, isLoading});
+          });
+          if (variants && variants.some((v: ProductVariant) => selectedSizes.includes(v.size) && v.stock > 0)) {
+            matchingIds.add(p.id);
+          }
+        }
+        setFilteredProductIds(Array.from(matchingIds));
+      };
+
+      findProductsWithSizes();
+    }, [allProducts, firestore, selectedSizes]);
+
+
+    const finalProducts = useMemo(() => {
+      if (!products) return [];
+      let list = products
+        .filter(p => category.toLowerCase() === 'all' || p.category.toLowerCase() === category.toLowerCase())
+        .filter(p => searchTerm ? p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())) : true)
+        .filter(p => p.price >= priceRange[0] && p.price <= priceRange[1]);
+
+      if (filteredProductIds !== null) {
+        list = list.filter(p => filteredProductIds.includes(p.id));
+      }
+      
+      return list;
+
+    }, [products, category, searchTerm, priceRange, filteredProductIds]);
+
+    if (isLoading) {
+      return <ProductsLoadingSkeleton />;
+    }
+    
+    if (finalProducts.length > 0) {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {finalProducts.map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div className="text-center py-20">
+        <h2 className="text-2xl font-bold">No Products Found</h2>
+        <p className="text-muted-foreground mt-2">Try adjusting your filters or adding products in the admin panel.</p>
+      </div>
+    );
   }
 
   return (
@@ -173,22 +239,11 @@ export default function ProductsPage() {
 
         {/* Products Grid */}
         <main className="md:col-span-3">
-          {isLoading ? (
-            <ProductsLoadingSkeleton />
-          ) : filteredProducts.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-20">
-              <h2 className="text-2xl font-bold">No Products Found</h2>
-              <p className="text-muted-foreground mt-2">Try adjusting your filters or adding products in the admin panel.</p>
-            </div>
-          )}
+          <FilteredProductGrid />
         </main>
       </div>
     </div>
   );
 }
+
+    

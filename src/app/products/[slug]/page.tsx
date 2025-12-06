@@ -1,9 +1,9 @@
+
 "use client";
 
 import { notFound } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
-import { placeholderProducts } from "@/lib/placeholder-data";
 import { ProductCarousel } from "@/components/products/ProductCarousel";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -12,13 +12,78 @@ import { Badge } from "@/components/ui/badge";
 import { useCart } from "@/context/CartContext";
 import type { Product, ProductVariant } from "@/lib/types";
 import { ShoppingCart, Minus, Plus, ArrowLeft } from "lucide-react";
+import { useDoc, useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection, doc } from "firebase/firestore";
+import { Skeleton } from "@/components/ui/skeleton";
 
-export default function ProductPage({ params: { slug } }: { params: { slug: string } }) {
-  const product = placeholderProducts.find((p) => p.slug === slug);
+function ProductPageSkeleton() {
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="mb-6">
+        <Skeleton className="h-6 w-32" />
+      </div>
+      <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
+        <div>
+          <Skeleton className="aspect-square w-full max-w-lg mx-auto rounded-lg" />
+        </div>
+        <div className="flex flex-col">
+          <Skeleton className="h-10 w-3/4" />
+          <Skeleton className="h-8 w-1/4 mt-2" />
+          <div className="mt-4 flex gap-2">
+            <Skeleton className="h-6 w-16" />
+            <Skeleton className="h-6 w-20" />
+          </div>
+          <Skeleton className="h-24 w-full mt-4" />
+          
+          <div className="mt-6">
+            <Skeleton className="h-7 w-28" />
+            <div className="flex flex-wrap gap-2 mt-2">
+              <Skeleton className="h-12 w-16" />
+              <Skeleton className="h-12 w-16" />
+              <Skeleton className="h-12 w-16" />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4 mt-6">
+            <Skeleton className="h-7 w-24" />
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-8 w-8 rounded-md" />
+              <Skeleton className="h-6 w-10" />
+              <Skeleton className="h-8 w-8 rounded-md" />
+            </div>
+          </div>
+
+          <div className="mt-auto pt-8">
+            <Skeleton className="h-12 w-full" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+export default function ProductPage({ params }: { params: { slug: string } }) {
+  const { slug } = params;
   
   const { addToCart } = useCart();
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
   const [quantity, setQuantity] = useState(1);
+  
+  const firestore = useFirestore();
+
+  // Note: This assumes slugs are unique and used as document IDs.
+  // If not, you'd need a query.
+  const productRef = useMemoFirebase(() => (firestore ? doc(firestore, "products", slug) : null), [firestore, slug]);
+  const { data: product, isLoading: isProductLoading } = useDoc<Product>(productRef);
+
+  const variantsRef = useMemoFirebase(() => (firestore && product ? collection(firestore, "products", product.id, "variants") : null), [firestore, product]);
+  const { data: variants, isLoading: areVariantsLoading } = useCollection<ProductVariant>(variantsRef);
+
+
+  if (isProductLoading || areVariantsLoading) {
+    return <ProductPageSkeleton />;
+  }
 
   if (!product) {
     notFound();
@@ -39,7 +104,7 @@ export default function ProductPage({ params: { slug } }: { params: { slug: stri
   }
 
   const handleVariantChange = (size: string) => {
-    const variant = product.variants.find(v => v.size === size);
+    const variant = variants?.find(v => v.size === size);
     if(variant) {
         setSelectedVariant(variant);
         setQuantity(1); // Reset quantity when variant changes
@@ -78,7 +143,7 @@ export default function ProductPage({ params: { slug } }: { params: { slug: stri
                 onValueChange={handleVariantChange} 
                 className="flex flex-wrap gap-2 mt-2"
             >
-              {product.variants.map((variant) => (
+              {variants?.map((variant) => (
                 <div key={variant.size}>
                   <RadioGroupItem value={variant.size} id={variant.size} className="sr-only" disabled={variant.stock === 0} />
                   <Label htmlFor={variant.size} className={`border rounded-md p-3 px-4 cursor-pointer text-sm ${variant.stock === 0 ? 'cursor-not-allowed opacity-50' : 'hover:bg-accent hover:text-accent-foreground'} ${selectedVariant?.size === variant.size ? 'bg-primary text-primary-foreground' : ''}`}>
@@ -119,3 +184,5 @@ export default function ProductPage({ params: { slug } }: { params: { slug: stri
     </div>
   );
 }
+
+    
