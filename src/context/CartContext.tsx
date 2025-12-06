@@ -18,9 +18,11 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [isClient, setIsClient] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
+    setIsClient(true);
     const storedCart = localStorage.getItem("cart");
     if (storedCart) {
       setCart(JSON.parse(storedCart));
@@ -28,12 +30,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (cart.length > 0) {
-      localStorage.setItem("cart", JSON.stringify(cart));
-    } else {
-      localStorage.removeItem("cart");
+    if (isClient) {
+      if (cart.length > 0) {
+        localStorage.setItem("cart", JSON.stringify(cart));
+      } else {
+        localStorage.removeItem("cart");
+      }
     }
-  }, [cart]);
+  }, [cart, isClient]);
 
   const addToCart = (item: CartItem) => {
     setCart((prevCart) => {
@@ -85,20 +89,20 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     0
   );
   
-  const itemCount = cart.reduce((total, item) => total + item.quantity, 0);
+  const itemCount = isClient ? cart.reduce((total, item) => total + item.quantity, 0) : 0;
+
+  const value = {
+    cart,
+    addToCart,
+    removeFromCart,
+    updateQuantity,
+    clearCart,
+    cartTotal,
+    itemCount,
+  };
 
   return (
-    <CartContext.Provider
-      value={{
-        cart,
-        addToCart,
-        removeFromCart,
-        updateQuantity,
-        clearCart,
-        cartTotal,
-        itemCount,
-      }}
-    >
+    <CartContext.Provider value={value}>
       {children}
     </CartContext.Provider>
   );
