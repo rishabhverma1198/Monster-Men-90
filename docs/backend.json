@@ -1,0 +1,252 @@
+{
+  "entities": {
+    "Product": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Product",
+      "type": "object",
+      "description": "Represents a product available for sale.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the product."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the product."
+        },
+        "category": {
+          "type": "string",
+          "description": "The category the product belongs to (Men, Women, etc.)."
+        },
+        "images": {
+          "type": "array",
+          "description": "Array of URLs pointing to the product images.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description of the product."
+        },
+        "price": {
+          "type": "number",
+          "description": "The price of the product."
+        },
+        "tags": {
+          "type": "array",
+          "description": "Array of tags associated with the product for search and filtering.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "slug": {
+          "type": "string",
+          "description": "A URL-friendly version of the product name."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the product was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the product was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "category",
+        "images",
+        "description",
+        "price",
+        "tags",
+        "slug",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ProductVariant": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ProductVariant",
+      "type": "object",
+      "description": "Represents a specific variant of a product (e.g., size).",
+      "properties": {
+        "productId": {
+          "type": "string",
+          "description": "Reference to the Product. (Relationship: Product 1:N ProductVariant)"
+        },
+        "size": {
+          "type": "string",
+          "description": "The size of the variant (S, M, L, XL, XXL)."
+        },
+        "stock": {
+          "type": "number",
+          "description": "The current stock level for this variant."
+        },
+        "price": {
+          "type": "number",
+          "description": "The price for this specific variant. Can differ from product price."
+        }
+      },
+      "required": [
+        "productId",
+        "size",
+        "stock",
+        "price"
+      ]
+    },
+    "Order": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Order",
+      "type": "object",
+      "description": "Represents a customer order.",
+      "properties": {
+        "orderId": {
+          "type": "string",
+          "description": "Unique identifier for the order."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the customer who placed the order."
+        },
+        "phone": {
+          "type": "string",
+          "description": "The phone number of the customer."
+        },
+        "items": {
+          "type": "array",
+          "description": "Array of items in the order. Each item should include the product ID, size and quantity.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the order (Pending, Confirmed, Packed, Shipped, Delivered)."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the order was placed.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "orderId",
+        "name",
+        "phone",
+        "items",
+        "status",
+        "createdAt"
+      ]
+    },
+    "Lead": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Lead",
+      "type": "object",
+      "description": "Represents a lead generated from a checkout.",
+      "properties": {
+        "orderId": {
+          "type": "string",
+          "description": "Reference to the Order. (Relationship: Lead 1:1 Order)"
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the customer."
+        },
+        "phone": {
+          "type": "string",
+          "description": "The phone number of the customer."
+        },
+        "items": {
+          "type": "array",
+          "description": "List of items ordered by the customer.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "contacted": {
+          "type": "boolean",
+          "description": "Indicates if the lead has been contacted."
+        },
+        "blacklisted": {
+          "type": "boolean",
+          "description": "Indicates if the customer is blacklisted."
+        }
+      },
+      "required": [
+        "orderId",
+        "name",
+        "phone",
+        "items",
+        "contacted",
+        "blacklisted"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "products/{productId}",
+        "definition": {
+          "entityName": "Product",
+          "schema": {
+            "$ref": "#/backend/entities/Product"
+          },
+          "description": "Stores product information.  The document ID is the product ID.",
+          "params": [
+            {
+              "name": "productId",
+              "description": "Unique identifier for the product."
+            }
+          ]
+        }
+      },
+      {
+        "path": "products/{productId}/variants/{variantId}",
+        "definition": {
+          "entityName": "ProductVariant",
+          "schema": {
+            "$ref": "#/backend/entities/ProductVariant"
+          },
+          "description": "Stores product variant information, such as size and stock levels.  The document ID is the variant ID.",
+          "params": [
+            {
+              "name": "productId",
+              "description": "Unique identifier for the product."
+            },
+            {
+              "name": "variantId",
+              "description": "Unique identifier for the variant."
+            }
+          ]
+        }
+      },
+      {
+        "path": "orders_leads/{orderId}",
+        "definition": {
+          "entityName": "Order",
+          "schema": {
+            "$ref": "#/backend/entities/Order"
+          },
+          "description": "Stores order and lead information.  The document ID is the order ID.",
+          "params": [
+            {
+              "name": "orderId",
+              "description": "Unique identifier for the order."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to support an e-commerce application, \"MonserMens90\", focusing on simplicity and ease of management, especially for a single admin. Given the absence of user authentication for buyers and the admin-centric product management, the structure is optimized for these requirements.\n\nThe `products` collection stores product information.  `productId` serves as the document ID. A subcollection `variants` under each product stores size-specific stock and price details. This allows efficient querying for available sizes and their respective prices. This design directly supports product browsing, filtering, and display of product details.\n\nThe `orders_leads` collection stores order information, with `orderId` being the document ID. This collection captures essential order details such as customer name, phone number, ordered items, order status, and creation timestamp. Each document represents both an order and a lead.  Authorization independence is not a significant concern here because the admin is the sole actor managing these documents. Segregation is not needed because all documents in `orders_leads` have the same security requirements (admin-only access). Because we are not using `get()` in the rules, we are avoiding hierarchical authorization dependencies. This collection supports order tracking and admin functionalities for order management and lead handling.\n\nThis data structure directly supports all the core app features, including product browsing, displaying product details, managing the cart system, the checkout process, generating WhatsApp order notifications, saving order data, order tracking, and the admin panel for managing orders and products. The structure is simple, and efficient for the expected use case."
+  }
+}

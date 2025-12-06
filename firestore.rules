@@ -1,0 +1,127 @@
+/**
+ * This ruleset enforces a security model for an e-commerce application with a public-facing product catalog
+ * and a private, admin-only area for managing products and orders.
+ *
+ * Core Philosophy:
+ * The rules implement a "Public Read, Admin Write" strategy. All visitors, authenticated or not,
+ * can browse products and their variants. However, all write operations (creating, updating, or deleting
+ * products and orders) are strictly limited to authenticated users who are designated as administrators.
+ * Order creation is a special case, allowed for any signed-in user (including anonymous ones) to support
+ * a public checkout flow.
+ *
+ * Data Structure:
+ * - /products/{productId}: A top-level collection for all product listings. Publicly readable.
+ * - /products/{productId}/variants/{variantId}: A subcollection for product-specific details like size and stock. Publicly readable.
+ * - /orders_leads/{orderId}: A top-level collection for customer orders. This data is sensitive and is
+ *   only readable and manageable by administrators.
+ *
+ * Key Security Decisions:
+ * - Admin Role Management: An administrator is identified by the existence of a document in a top-level
+ *   `/admins` collection, where the document ID is the user's UID. This is a secure and standard
+ *   pattern for managing global roles. Example: `/admins/some_admin_uid`.
+ * - Public Catalog: The `/products` collection and its subcollections are fully public for read
+ *   operations (`get`, `list`) to allow any user to browse the store.
+ * - Secure Order Submission: Users can create documents in `/orders_leads` if they are signed in (even
+ *   anonymously), but they cannot read, update, or delete them afterward. This enables a "fire-and-forget"
+ *   order submission flow from the client.
+ * - No User Data Listing: General listing of sensitive collections like `/orders_leads` is disabled for
+ *   the public, preventing data leakage.
+ *
+ * Denormalization for Authorization:
+ * This ruleset relies on a global role (`isAdmin`) rather than per-document ownership fields (like `ownerId`).
+ * This is achieved by checking for the user's UID in a separate `/admins/{userId}` collection. This approach
+ * is suitable for applications where a small group of administrators manages all data centrally, avoiding the
+ * need to denormalize an owner ID onto every single product or order document.
+ *
+ * Structural Segregation:
+ * The separation between the public `/products` collection and the private `/orders_leads` collection provides
+ * a clear and secure boundary. This prevents any accidental exposure of sensitive order information when
+ * querying the public product catalog.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions for reusable logic
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the currently authenticated user is an administrator.
+     * Admin status is determined by the existence of their UID as a document
+     * in the top-level /admins collection.
+     */
+    function isAdmin() {
+      return exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    /**
+     * A robust check for state-changing operations (update, delete).
+     * It ensures the user is an admin AND the document they are trying to modify
+     * actually exists, preventing writes to non-existent paths.
+     */
+    function isExistingAdmin(docResource) {
+      return isAdmin() && docResource != null;
+    }
+
+
+    /**
+     * @description Publicly readable product catalog. Only admins can create, update, or delete products.
+     * @path /products/{productId}
+     * @allow (get) Any user, signed-in or not, can view a single product.
+     * @deny (create) A non-admin user attempts to create a new product.
+     * @principle Implements a "Public Read, Admin Write" model for the main product catalog.
+     */
+    match /products/{productId} {
+      allow get, list: if true;
+      allow create: if isAdmin() && request.resource.data.id == productId;
+      allow update, delete: if isExistingAdmin(resource);
+    }
+
+    /**
+     * @description Product variants (e.g., sizes, colors). Publicly readable, admin-only writes.
+     * @path /products/{productId}/variants/{variantId}
+     * @allow (get) Any user can read the variants for a specific product.
+     * @deny (update) An admin tries to change the `productId` of an existing variant, which is disallowed.
+     * @principle Enforces relational integrity by ensuring variants always belong to their parent product.
+     */
+    match /products/{productId}/variants/{variantId} {
+      allow get, list: if true;
+      allow create: if isAdmin() && request.resource.data.productId == productId;
+      allow update: if isExistingAdmin(resource) && request.resource.data.productId == resource.data.productId;
+      allow delete: if isExistingAdmin(resource);
+    }
+
+    /**
+     * @description Sensitive customer orders. Orders can be created by any signed-in user (including anonymous)
+     * but can only be viewed and managed by admins.
+     * @path /orders_leads/{orderId}
+     * @allow (create) An anonymous but signed-in user submits an order from the checkout page.
+     * @deny (get) A regular user attempts to read another user's order details using its ID.
+     * @principle Secures sensitive user data by restricting all read/update/delete access to admins,
+     * while allowing a public "write-only" endpoint for order submission.
+     */
+    match /orders_leads/{orderId} {
+      allow get, list: if isAdmin();
+      allow create: if isSignedIn() && request.resource.data.orderId == orderId;
+      allow update, delete: if isExistingAdmin(resource);
+    }
+
+    /**
+     * @description Admin role collection. This collection is private and cannot be read or written to by clients.
+     * Admin documents must be added or removed manually through the Firebase Console or a trusted server environment.
+     * @path /admins/{userId}
+     * @allow None. All client-side access is denied.
+     * @deny (get) Any user, including an admin, attempts to read from the /admins collection.
+     * @principle Secures the role management system by making it inaccessible from the client SDKs.
+     */
+    match /admins/{userId} {
+      allow get: if false;
+      allow list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}
