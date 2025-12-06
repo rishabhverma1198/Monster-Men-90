@@ -35,11 +35,13 @@ export default function AdminDashboard() {
   );
   const { data: orders } = useCollection<Order>(ordersQuery);
 
-  const totalRevenue = orders?.reduce((sum, order) => {
-    return sum + order.items.reduce((orderSum, item) => orderSum + (item.price * item.quantity), 0);
-  }, 0) || 0;
+  const totalRevenue = orders
+    ? orders.reduce((sum, order) => {
+        return sum + order.items.reduce((orderSum, item) => orderSum + (item.price * item.quantity), 0);
+      }, 0)
+    : 0;
 
-  const recentOrders = orders?.slice(0, 5);
+  const recentOrders = orders ? orders.slice(0, 5) : [];
 
 
   return (
