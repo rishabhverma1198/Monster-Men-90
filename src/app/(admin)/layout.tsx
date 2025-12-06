@@ -92,18 +92,21 @@ export default function AdminLayout({
             </SidebarMenu>
           </SidebarContent>
           <SidebarFooter>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src="https://picsum.photos/seed/admin/100/100" />
-                  <AvatarFallback>AD</AvatarFallback>
-                </Avatar>
-                <span className="text-sm font-semibold">Admin User</span>
-              </div>
-              <Button variant="ghost" size="icon" onClick={handleLogout} className="text-sidebar-foreground/70 hover:text-sidebar-foreground">
+            <Button variant="ghost" className="w-full justify-start text-left" onClick={handleLogout}>
+              <div className="flex w-full items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src="https://picsum.photos/seed/admin/100/100" />
+                    <AvatarFallback>AD</AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col">
+                     <span className="text-sm font-semibold">Admin User</span>
+                     <span className="text-xs text-muted-foreground">Logout</span>
+                  </div>
+                </div>
                 <LogOut className="h-5 w-5" />
-              </Button>
-            </div>
+              </div>
+            </Button>
           </SidebarFooter>
         </Sidebar>
         <SidebarInset>
