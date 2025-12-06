@@ -109,5 +109,22 @@ export const placeholderOrders: Order[] = [
     ],
     status: 'Pending',
     createdAt: new Date('2024-05-20T10:30:00Z'),
+  },
+  {
+    orderId: 'MM90ZIVKTG',
+    name: 'Jane Smith',
+    phone: '8368802934',
+    items: [
+        {
+            productId: '2',
+            name: 'Striped Crewneck Sweater',
+            image: getPlaceholderImage('men-sweater').imageUrl,
+            size: 'L',
+            quantity: 2,
+            price: 65.00
+        }
+    ],
+    status: 'Shipped',
+    createdAt: new Date('2024-05-22T14:00:00Z')
   }
 ];
