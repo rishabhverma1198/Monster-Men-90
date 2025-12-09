@@ -27,13 +27,13 @@ service cloud.firestore {
     }
 
     // Rule for the entire orders_leads collection
-    // This allows the admin to LIST all documents in this collection.
+    // This allows the admin to LIST all documents in this collection for the leads page.
     match /orders_leads {
       allow list: if isAdmin();
     }
 
     // Rule for individual order documents
-    // This allows creating an order and lets the admin manage a specific order.
+    // This allows creating an order and lets the admin get/update a specific order.
     match /orders_leads/{orderId} {
       allow create: if true;
       allow get, update, delete: if isAdmin();

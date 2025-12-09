@@ -1,6 +1,7 @@
 
 "use client";
 
+import { useState } from "react";
 import {
   Card,
   CardContent,
@@ -24,10 +25,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Order } from "@/lib/types";
-import { useCollection, useFirestore, useMemoFirebase, useUser, errorEmitter, FirestorePermissionError } from "@/firebase";
-import { collection, doc, updateDoc, Timestamp, query, orderBy } from "firebase/firestore";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useFirestore, useUser, errorEmitter, FirestorePermissionError, useDoc, useMemoFirebase } from "@/firebase";
+import { doc, updateDoc, Timestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Loader2, Search } from "lucide-react";
+import { trackOrder as trackOrderAction } from "@/app/actions";
 
 const STATUS_CLASSES: Record<Order['status'], string> = {
   Pending: "bg-yellow-100 text-yellow-800 border-yellow-200",
@@ -37,34 +42,36 @@ const STATUS_CLASSES: Record<Order['status'], string> = {
   Delivered: "bg-green-100 text-green-800 border-green-200",
 };
 
-function OrderRowSkeleton() {
-    return (
-        <TableRow>
-            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-            <TableCell><div className="flex flex-col gap-2"><Skeleton className="h-4 w-20" /><Skeleton className="h-3 w-28" /></div></TableCell>
-            <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-            <TableCell className="text-center"><Skeleton className="h-6 w-8 mx-auto" /></TableCell>
-            <TableCell className="text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
-            <TableCell className="text-center"><Skeleton className="h-8 w-[120px] mx-auto" /></TableCell>
-        </TableRow>
-    )
-}
 
 export default function OrdersPage() {
   const firestore = useFirestore();
-  const { user, isUserLoading } = useUser();
+  const { user } = useUser();
   const { toast } = useToast();
-
-  const ordersQuery = useMemoFirebase(
-    () => (firestore && user ? query(collection(firestore, 'orders_leads'), orderBy('createdAt', 'desc')) : null),
-    [firestore, user]
-  );
   
-  const { data: orders, isLoading } = useCollection<Order & { createdAt: Timestamp }>(ordersQuery);
+  const [orderId, setOrderId] = useState("");
+  const [phone, setPhone] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [searchedOrder, setSearchedOrder] = useState<Order | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const getTotalOrderValue = (order: Order) => {
-    return order.items.reduce((total, item) => total + item.price * item.quantity, 0);
-  }
+  const handleTrackOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setSearchedOrder(null);
+    setError(null);
+    
+    // Using the server action to track order
+    const result = await trackOrderAction(orderId, phone);
+
+    if (result.success && result.order) {
+      setSearchedOrder(result.order);
+    } else {
+      setError(result.error || "Failed to find order.");
+    }
+
+    setIsLoading(false);
+  };
+
 
   const handleStatusChange = (orderId: string, newStatus: Order['status']) => {
     if (!firestore || !user) return;
@@ -77,6 +84,10 @@ export default function OrdersPage() {
                 title: "Status Updated",
                 description: `Order ${orderId} is now ${newStatus}.`,
             });
+            // Optimistically update the local state
+            if(searchedOrder && searchedOrder.orderId === orderId) {
+              setSearchedOrder({...searchedOrder, status: newStatus});
+            }
         })
         .catch(async (serverError) => {
             const permissionError = new FirestorePermissionError({
@@ -88,76 +99,92 @@ export default function OrdersPage() {
         });
   }
 
-  const dataLoading = isLoading || isUserLoading;
+  const getTotalOrderValue = (order: Order) => {
+    return order.items.reduce((total, item) => total + item.price * item.quantity, 0);
+  }
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-4">
-        <h1 className="text-2xl font-semibold">Orders</h1>
+        <h1 className="text-2xl font-semibold">Order Management</h1>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>All Orders</CardTitle>
+          <CardTitle>Track Specific Order</CardTitle>
           <CardDescription>
-            View and manage all customer orders.
+            Enter an Order ID and customer's phone to find and manage a specific order.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Order ID</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead className="text-center">Items</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead className="text-center">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {dataLoading ? (
-                <>
-                  <OrderRowSkeleton />
-                  <OrderRowSkeleton />
-                  <OrderRowSkeleton />
-                  <OrderRowSkeleton />
-                  <OrderRowSkeleton />
-                </>
-              ): orders && orders.length > 0 ? (
-                orders.map((order) => (
-                  <TableRow key={order.orderId}>
-                    <TableCell className="font-medium">{order.orderId}</TableCell>
-                    <TableCell>
-                        <div className="font-medium">{order.name}</div>
-                        <div className="text-sm text-muted-foreground">{order.phone}</div>
-                    </TableCell>
-                    <TableCell>{order.createdAt ? order.createdAt.toDate().toLocaleDateString() : 'N/A'}</TableCell>
-                    <TableCell className="text-center">{order.items.length}</TableCell>
-                    <TableCell className="text-right">${getTotalOrderValue(order).toFixed(2)}</TableCell>
-                    <TableCell className="text-center">
-                      <Select defaultValue={order.status} onValueChange={(value) => handleStatusChange(order.orderId, value as Order['status'])}>
-                        <SelectTrigger className={`w-[120px] text-xs h-8 ${STATUS_CLASSES[order.status]}`}>
-                          <SelectValue placeholder="Status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Object.keys(STATUS_CLASSES).map(status => (
-                            <SelectItem key={status} value={status}>{status}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
+           <form onSubmit={handleTrackOrder} className="flex flex-col sm:flex-row items-end gap-4 mb-6">
+              <div className="w-full sm:w-auto flex-grow space-y-2">
+                <Label htmlFor="order-id">Order ID</Label>
+                <Input
+                  id="order-id"
+                  placeholder="MM90-XXXXXX"
+                  value={orderId}
+                  onChange={(e) => setOrderId(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="w-full sm:w-auto flex-grow space-y-2">
+                <Label htmlFor="phone">Customer Phone</Label>
+                <Input
+                  id="phone"
+                  placeholder="Customer's phone"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  required
+                />
+              </div>
+              <Button type="submit" className="w-full sm:w-auto" disabled={isLoading}>
+                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+                Track Order
+              </Button>
+            </form>
+
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            
+            {searchedOrder && (
+               <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Order ID</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="text-center">Items</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
                   </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center">
-                    No orders found.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                </TableHeader>
+                <TableBody>
+                    <TableRow key={searchedOrder.orderId}>
+                        <TableCell className="font-medium">{searchedOrder.orderId}</TableCell>
+                        <TableCell>
+                            <div className="font-medium">{searchedOrder.name}</div>
+                            <div className="text-sm text-muted-foreground">{searchedOrder.phone}</div>
+                        </TableCell>
+                        <TableCell>{searchedOrder.createdAt ? new Date(searchedOrder.createdAt).toLocaleDateString() : 'N/A'}</TableCell>
+                        <TableCell className="text-center">{searchedOrder.items.length}</TableCell>
+                        <TableCell className="text-right">${getTotalOrderValue(searchedOrder).toFixed(2)}</TableCell>
+                        <TableCell className="text-center">
+                        <Select defaultValue={searchedOrder.status} onValueChange={(value) => handleStatusChange(searchedOrder.orderId, value as Order['status'])}>
+                            <SelectTrigger className={`w-[120px] text-xs h-8 ${STATUS_CLASSES[searchedOrder.status]}`}>
+                            <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                            {Object.keys(STATUS_CLASSES).map(status => (
+                                <SelectItem key={status} value={status}>{status}</SelectItem>
+                            ))}
+                            </SelectContent>
+                        </Select>
+                        </TableCell>
+                    </TableRow>
+                </TableBody>
+              </Table>
+            )}
+
         </CardContent>
       </Card>
     </div>
