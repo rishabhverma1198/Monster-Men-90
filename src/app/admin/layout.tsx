@@ -60,36 +60,53 @@ export default function AdminLayout({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    console.log("[AdminLayout] useEffect triggered.");
+    console.log(`[AdminLayout] Initial state: isUserLoading=${isUserLoading}, firestore available=${!!firestore}`);
+
     if (isUserLoading || !firestore) {
+      console.log("[AdminLayout] Still loading user or firestore is not available. Setting state to 'loading'.");
       setAuthState("loading");
       setVerificationStep("Verifying Login");
       return;
     }
+    
+    console.log("[AdminLayout] User loading complete. User object:", user);
 
     if (!user) {
+      console.log("[AdminLayout] No user found. Redirecting to /admin/login.");
       router.replace("/admin/login");
       setAuthState("unauthenticated");
       return;
     }
 
     setVerificationStep("Checking Admin Privileges");
+    console.log("[AdminLayout] User found. Proceeding to check admin status for UID:", user.uid);
+    
     const checkAdminStatus = async () => {
       try {
+        console.log("[AdminLayout] Creating Firestore document reference for admins collection.");
         const adminDocRef = doc(firestore, "admins", user.uid);
+        console.log("[AdminLayout] Fetching admin document from Firestore...");
         const adminDoc = await getDoc(adminDocRef);
 
         if (adminDoc.exists()) {
+          console.log("[AdminLayout] Admin document exists. User is an admin. Setting state to 'authenticated'.");
           setAuthState("authenticated");
           setVerificationStep("Done");
         } else {
+          console.log("[AdminLayout] Admin document does not exist. User is not an admin. Signing out and redirecting.");
           setAuthState("not-admin");
           if (auth) await signOut(auth);
           router.replace("/admin/login?error=not-admin");
         }
-      } catch (error) {
-         setErrorMessage("Could not verify admin status. Please check your internet connection and Firestore rules.");
+      } catch (error: any) {
+         console.error("[AdminLayout] CRITICAL ERROR checking admin status:", error);
+         setErrorMessage(`Could not verify admin status. Error: ${error.message}. Check your internet connection and Firestore rules.`);
          setAuthState("error");
-         if (auth) await signOut(auth);
+         if (auth) {
+           console.log("[AdminLayout] Signing out user due to error.");
+           await signOut(auth);
+         }
       }
     };
 
@@ -98,10 +115,13 @@ export default function AdminLayout({
 
   const handleLogout = async () => {
     if (auth) {
+      console.log("[AdminLayout] handleLogout called. Signing out user.");
       await signOut(auth);
       router.push("/admin/login");
     }
   };
+
+  console.log(`[AdminLayout] Rendering with authState: ${authState}`);
 
   if (authState !== "authenticated") {
     return (
