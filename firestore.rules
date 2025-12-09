@@ -1,88 +1,38 @@
-/**
- * Core Philosophy: This ruleset governs an e-commerce application backend. The security model is
- * admin-centric, where a specific admin user has full write access to all data, while the general
- * public (including unauthenticated users) has read-only access to the product catalog.
- *
- * Data Structure:
- * - /admins/{uid}: A private collection to store admin user UIDs.
- * - /products/{productId}: A public collection of all products.
- * - /products/{productId}/variants/{variantId}: A public subcollection for product sizes and stock.
- * - /orders_leads/{orderId}: A private collection for customer orders.
- *
- * Key Security Decisions:
- * - Admin-Only Writes: All write operations (create, update, delete) across the entire database
- *   are restricted to a single, hardcoded admin user UID. This ensures data integrity.
- * - Public Product Catalog: The `/products` collection and its `variants` subcollections are
- *   publicly readable and listable to allow any user or guest to browse the store.
- * - Private Orders: The `/orders_leads` collection is write-only for the public (to place orders)
- *   and completely restricted from being read or listed by anyone except the admin. This protects
- *   sensitive customer information like names and phone numbers.
- * - Guest Checkouts: Order creation is permitted for any user, including anonymous ones, to
- *   facilitate a simple guest checkout process without requiring user accounts.
- */
+
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions for readable and reusable logic.
-
-    /**
-     * Checks if the request is from the designated admin user.
-     * The admin is identified by their specific email address.
-     */
+    // Helper function to identify the admin user by their email.
     function isAdmin() {
       return request.auth != null && request.auth.token.email == 'jayantv427@gmail.com';
     }
 
-    /**
-     * @description Stores admin user records. Only the logged-in user can access their own admin record.
-     * @path /admins/{userId}
-     * @allow (read, write) An admin can access their own record to verify their status.
-     * @deny (list) A non-admin user attempts to list all admins.
-     * @principle Secures admin role verification by restricting access to the user themselves.
-     */
+    // Admin records are only readable/writable by the admin themselves.
     match /admins/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-
-    /**
-     * @description Publicly readable product catalog, manageable only by an admin.
-     * @path /products/{productId}
-     * @allow (read, list) Any user, authenticated or not, can read product details.
-     * @allow (write) Only the admin can create, update, or delete products.
-     * @principle Public read access for catalog items with admin-only write control to protect data integrity.
-     */
+    // Products and their variants are publicly readable.
+    // Only the admin can modify them.
     match /products/{productId} {
       allow get, list: if true;
       allow write: if isAdmin();
+
+      match /variants/{variantId} {
+        allow get, list: if true;
+        allow write: if isAdmin();
+      }
     }
 
-    /**
-     * @description Publicly readable product variants (e.g., sizes, stock), manageable only by an admin.
-     * @path /products/{productId}/variants/{variantId}
-     * @allow (read, list) Any user can view variant details.
-     * @allow (write) Only the admin can create, update, or delete variants.
-     * @principle Enforces that variants are linked to products and managed by admins.
-     */
-    match /products/{productId}/variants/{variantId} {
-      allow get, list: if true;
-      allow write: if isAdmin();
-    }
-
-    /**
-     * @description Stores customer orders. Anyone can create an order (guest checkout),
-     * but only the admin can view or manage them to protect customer privacy.
-     * @path /orders_leads/{orderId}
-     * @allow (create) An unauthenticated guest user successfully places a new order.
-     * @allow (read, list, update, delete) Only the admin can manage orders.
-     * @principle Protects sensitive user data (PII) by making orders write-only for the public and fully accessible to the admin.
-     */
+    // Orders can be created by anyone (guest checkout).
     match /orders_leads/{orderId} {
       allow create: if true;
       allow get, update, delete: if isAdmin();
     }
 
+    // THIS IS THE CRITICAL FIX:
     // This rule specifically allows the admin to LIST the entire 'orders_leads' collection.
     // This is separate from the rule above because 'list' applies to the collection path,
     // not the individual document path.
