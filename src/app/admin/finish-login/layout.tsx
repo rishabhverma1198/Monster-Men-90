@@ -8,5 +8,3 @@ export default function FinishLoginLayout({
   // so we just render the children directly.
   return <>{children}</>;
 }
-
-    

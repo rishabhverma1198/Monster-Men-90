@@ -88,5 +88,3 @@ export default function FinishLoginPage() {
         </div>
     );
 }
-
-    
