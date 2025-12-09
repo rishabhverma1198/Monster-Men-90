@@ -184,77 +184,35 @@
     ]
   },
   "firestore": {
-    "structure": [
+    "rules": "rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    function isSignedIn() {\n      return request.auth != null;\n    }\n\n    function isAdmin() {\n      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));\n    }\n\n    match /products/{productId} {\n      allow read: if true;\n      allow write: if isAdmin();\n\n      match /variants/{variantId} {\n        allow read: if true;\n        allow write: if isAdmin();\n      }\n    }\n\n    match /orders_leads/{orderId} {\n      allow create: if true;\n      allow read, update, delete: if isAdmin();\n    }\n\n    match /admins/{uid} {\n      allow read, write: if isAdmin();\n    }\n  }\n}\n",
+    "collections": [
       {
-        "path": "/products/{productId}",
-        "definition": {
-          "entityName": "Product",
-          "schema": {
-            "$ref": "#/backend/entities/Product"
-          },
-          "description": "Stores product information. Includes standard product details like name, category, images, description, price, tags, and slug.",
-          "params": [
-            {
-              "name": "productId",
-              "description": "The unique identifier for the product."
+        "name": "products",
+        "schema": {
+          "$ref": "#/entities/Product"
+        },
+        "subcollections": [
+          {
+            "name": "variants",
+            "schema": {
+              "$ref": "#/entities/Variant"
             }
-          ]
+          }
+        ]
+      },
+      {
+        "name": "orders_leads",
+        "schema": {
+          "$ref": "#/entities/OrderLead"
         }
       },
       {
-        "path": "/products/{productId}/variants/{variantId}",
-        "definition": {
-          "entityName": "Variant",
-          "schema": {
-            "$ref": "#/backend/entities/Variant"
-          },
-          "description": "Stores product variant information (e.g., size, stock, price).",
-          "params": [
-            {
-              "name": "productId",
-              "description": "The unique identifier for the product."
-            },
-            {
-              "name": "variantId",
-              "description": "The unique identifier for the variant."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/orders_leads/{orderId}",
-        "definition": {
-          "entityName": "OrderLead",
-          "schema": {
-            "$ref": "#/backend/entities/OrderLead"
-          },
-          "description": "Stores order information, including customer details, order items, and order status.",
-          "params": [
-            {
-              "name": "orderId",
-              "description": "The unique identifier for the order."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/admins/{uid}",
-        "definition": {
-          "entityName": "Admin",
-          "schema": {
-            "$ref": "#/backend/entities/Admin"
-          },
-          "description": "Documents in this collection grant admin privileges. Existence of a document for a given UID grants admin role.",
-          "params": [
-            {
-              "name": "uid",
-              "description": "The Firebase Auth UID of the admin user."
-            }
-          ]
+        "name": "admins",
+        "schema": {
+          "$ref": "#/entities/Admin"
         }
       }
-    ],
-    "reasoning": "The Firestore structure is designed to support the MonserMens90 e-commerce application, focusing on product catalog management, order processing, and a simple admin interface. Authorization Independence is maintained by not requiring `get()` calls in security rules. Instead, roles can be managed via a dedicated `admins/{uid}` collection. The structure is optimized for the app's unique requirements, like placing orders without user authentication and providing order tracking via Order ID and Phone number. This is achieved by storing order details in a dedicated `orders_leads` collection.\n\n**Authorization Independence:** Authorization relies solely on the existence of a document in the `/admins/{uid}` collection. There is no dependency on data outside of the authenticated user's ID.\n\n**QAPs (Queries are not Filters):** List operations for products are inherently secure as all products share the same access needs (publicly visible). Order lists are only accessible to admins (controlled via the `/admins/{uid}` collection).\n"
+    ]
   }
 }
     
