@@ -43,7 +43,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { useFirestore } from "@/firebase";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
-type AuthState = "loading" | "authenticated" | "unauthenticated" | "not-admin";
+type AuthState = "loading" | "authenticated" | "unauthenticated" | "not-admin" | "error";
 type VerificationStep = "Verifying Login" | "Checking Admin Privileges" | "Done";
 
 export default function AdminLayout({
@@ -57,6 +57,7 @@ export default function AdminLayout({
   const { user, isUserLoading } = useUser();
   const [authState, setAuthState] = useState<AuthState>("loading");
   const [verificationStep, setVerificationStep] = useState<VerificationStep>("Verifying Login");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (isUserLoading || !firestore) {
@@ -86,10 +87,9 @@ export default function AdminLayout({
           router.replace("/admin/login?error=not-admin");
         }
       } catch (error) {
-         console.error("Error checking admin status:", error);
-         setAuthState("not-admin");
+         setErrorMessage("Could not verify admin status. Please check your internet connection and Firestore rules.");
+         setAuthState("error");
          if (auth) await signOut(auth);
-         router.replace("/admin/login?error=firestore-error");
       }
     };
 
@@ -125,6 +125,16 @@ export default function AdminLayout({
                   <AlertTitle>Access Denied</AlertTitle>
                   <AlertDescription>
                     You are not authorized to view this page. Redirecting to login...
+                  </AlertDescription>
+                </Alert>
+            )}
+            {authState === "error" && (
+                <Alert variant="destructive">
+                  <ShieldAlert className="h-4 w-4" />
+                  <AlertTitle>Verification Failed</AlertTitle>
+                  <AlertDescription>
+                    {errorMessage}
+                    <Button onClick={() => router.push('/admin/login')} className="mt-4 w-full">Go to Login</Button>
                   </AlertDescription>
                 </Alert>
             )}
