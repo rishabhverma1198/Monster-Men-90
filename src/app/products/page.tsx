@@ -116,6 +116,7 @@ export default function ProductsPage() {
     const finalProducts = useMemo(() => {
       if (!products) return [];
       let list = products
+        .filter(p => p.status === 'active') // Only show active products
         .filter(p => category.toLowerCase() === 'all' || p.category.toLowerCase() === category.toLowerCase())
         .filter(p => searchTerm ? p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())) : true)
         .filter(p => p.price >= priceRange[0] && p.price <= priceRange[1]);
@@ -145,7 +146,7 @@ export default function ProductsPage() {
     return (
       <div className="text-center py-20">
         <h2 className="text-2xl font-bold">No Products Found</h2>
-        <p className="text-muted-foreground mt-2">Try adjusting your filters or adding products in the admin panel.</p>
+        <p className="text-muted-foreground mt-2">Try adjusting your filters or check back later.</p>
       </div>
     );
   }

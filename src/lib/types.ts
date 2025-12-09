@@ -17,8 +17,9 @@ export type Product = {
   price: number;
   tags: string[];
   slug: string;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
+  status: 'active' | 'inactive';
+  createdAt: any; // Using `any` for Firebase Timestamp or serialized string
+  updatedAt: any; // Using `any` for Firebase Timestamp or serialized string
 };
 
 export type CartItem = {

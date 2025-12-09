@@ -31,6 +31,7 @@ import { useState, useEffect } from "react";
 import { useFirestore } from "@/firebase";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, doc, writeBatch, serverTimestamp } from "firebase/firestore";
+import { Switch } from "@/components/ui/switch";
 
 const variantSchema = z.object({
   size: z.enum(["S", "M", "L", "XL", "XXL"]),
@@ -48,6 +49,7 @@ const productFormSchema = z.object({
   description: z.string().min(10, "Description must be at least 10 characters."),
   price: z.coerce.number().min(0.01, "Base price must be greater than 0."),
   tags: z.string().min(1, "Please add at least one tag."),
+  status: z.enum(['active', 'inactive']),
   images: z.array(z.instanceof(File))
     .min(1, "Please upload at least one image.")
     .max(5, "You can upload a maximum of 5 images."),
@@ -79,6 +81,7 @@ export function ProductForm({ onProductAdded }: ProductFormProps) {
       description: "",
       price: 0,
       tags: "",
+      status: "active",
       images: [],
       variants: [{ size: "M", stock: 10, price: 0 }],
     },
@@ -130,6 +133,7 @@ export function ProductForm({ onProductAdded }: ProductFormProps) {
             price: data.price,
             tags: data.tags.split(",").map(tag => tag.trim()),
             images: imageUrls,
+            status: data.status,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
         });
@@ -169,6 +173,26 @@ export function ProductForm({ onProductAdded }: ProductFormProps) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+        <FormField
+            control={form.control}
+            name="status"
+            render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                        <FormLabel className="text-base">Product Status</FormLabel>
+                        <FormDescription>
+                            Make the product active to show it in the store, or inactive to hide it.
+                        </FormDescription>
+                    </div>
+                    <FormControl>
+                        <Switch
+                            checked={field.value === 'active'}
+                            onCheckedChange={(checked) => field.onChange(checked ? 'active' : 'inactive')}
+                        />
+                    </FormControl>
+                </FormItem>
+            )}
+        />
         <div className="grid md:grid-cols-2 gap-8">
             <FormField
             control={form.control}

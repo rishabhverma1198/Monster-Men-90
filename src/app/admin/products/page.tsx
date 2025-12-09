@@ -37,8 +37,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useCollection, useFirestore, useMemoFirebase, useUser, errorEmitter, FirestorePermissionError } from "@/firebase";
-import { collection, deleteDoc, doc, getDocs, writeBatch, Timestamp } from "firebase/firestore";
-import type { Product, ProductVariant } from "@/lib/types";
+import { collection, deleteDoc, doc, getDocs, writeBatch, Timestamp, updateDoc } from "firebase/firestore";
+import type { Product } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -52,6 +52,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { getStorage, ref, deleteObject } from "firebase/storage";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 
 function ProductRowSkeleton() {
@@ -71,6 +73,9 @@ function ProductRowSkeleton() {
       </TableCell>
       <TableCell className="hidden md:table-cell">
         <Skeleton className="h-4 w-24" />
+      </TableCell>
+       <TableCell className="hidden md:table-cell">
+        <Skeleton className="h-6 w-12" />
       </TableCell>
       <TableCell>
         <Skeleton className="h-8 w-8" />
@@ -210,6 +215,7 @@ export default function AdminProductsPage() {
                     <TableHead className="hidden md:table-cell">
                       Created at
                     </TableHead>
+                    <TableHead className="hidden md:table-cell">Active</TableHead>
                     <TableHead>
                       <span className="sr-only">Actions</span>
                     </TableHead>
@@ -229,7 +235,7 @@ export default function AdminProductsPage() {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={6} className="h-24 text-center">
+                      <TableCell colSpan={7} className="h-24 text-center">
                         No products found. Add one to get started!
                       </TableCell>
                     </TableRow>
@@ -279,15 +285,32 @@ export default function AdminProductsPage() {
 }
 
 // Memoized row component to avoid re-rendering every row on filter change
-const ProductRow = memo(function ProductRow({ product, onSelectDelete }: { product: Product & { createdAt: Timestamp }, onSelectDelete: (product: Product) => void}) {
+const ProductRow = memo(function ProductRow({ product, onSelectDelete }: { product: Product, onSelectDelete: (product: Product) => void}) {
     const firestore = useFirestore();
     const user = useUser();
+    const { toast } = useToast();
 
-    const variantsCollection = useMemoFirebase(() => (firestore && user.user ? collection(firestore, 'products', product.id, 'variants') : null), [firestore, product.id, user.user]);
-    const { data: variants } = useCollection<ProductVariant>(variantsCollection);
+    const handleStatusChange = async (productId: string, newStatus: boolean) => {
+        if (!firestore) return;
+        const productRef = doc(firestore, 'products', productId);
+        const status = newStatus ? 'active' : 'inactive';
+        try {
+            await updateDoc(productRef, { status: status });
+            toast({
+                title: "Status Updated",
+                description: `Product status set to ${status}.`
+            })
+        } catch (error) {
+            console.error("Error updating product status:", error);
+            const permissionError = new FirestorePermissionError({
+                path: productRef.path,
+                operation: 'update',
+                requestResourceData: { status: status }
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        }
+    }
     
-    const hasStock = variants ? variants.some(v => v.stock > 0) : false;
-
     return (
         <TableRow>
             <TableCell className="hidden sm:table-cell">
@@ -303,15 +326,22 @@ const ProductRow = memo(function ProductRow({ product, onSelectDelete }: { produ
                 {product.name}
             </TableCell>
             <TableCell>
-                <Badge variant={hasStock ? "default" : "outline"}>
-                {hasStock ? "In Stock" : "Out of Stock"}
+                <Badge variant={product.status === 'active' ? "default" : "outline"}>
+                {product.status === 'active' ? "Active" : "Inactive"}
                 </Badge>
             </TableCell>
             <TableCell className="hidden md:table-cell">
                 ${product.price.toFixed(2)}
             </TableCell>
             <TableCell className="hidden md:table-cell">
-                {product.createdAt ? product.createdAt.toDate().toLocaleDateString() : 'N/A'}
+                {product.createdAt ? new Date(product.createdAt.seconds * 1000).toLocaleDateString() : 'N/A'}
+            </TableCell>
+            <TableCell className="hidden md:table-cell">
+                <Switch
+                    checked={product.status === 'active'}
+                    onCheckedChange={(checked) => handleStatusChange(product.id, checked)}
+                    aria-label="Toggle product status"
+                />
             </TableCell>
             <TableCell>
                 <DropdownMenu>
