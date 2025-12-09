@@ -7,9 +7,8 @@ import { DollarSign, Package, ShoppingCart, Users, ArrowUpRight } from "lucide-r
 import Link from "next/link";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, query, orderBy, limit, Timestamp, getCountFromServer } from "firebase/firestore";
-import type { Order, Product } from "@/lib/types";
+import { useFirestore, useUser } from "@/firebase";
+import { collection, getCountFromServer } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect, useState }from "react";
 
@@ -21,6 +20,16 @@ const salesData = [
   { name: "May", total: Math.floor(Math.random() * 2000) + 500 },
   { name: "Jun", total: 2730 },
 ];
+
+// Dummy Data for Recent Orders
+const DUMMY_NAMES = ["Ravi Kumar", "Priya Sharma", "Amit Singh", "Sunita Devi", "Vikram Rathore"];
+const dummyRecentOrders = Array.from({ length: 5 }, (_, i) => ({
+  orderId: `MM90-DUMMY${i + 1}`,
+  name: DUMMY_NAMES[i % DUMMY_NAMES.length],
+  phone: `+91 987654321${i}`,
+  total: Math.floor(Math.random() * 150) + 50,
+}));
+
 
 function StatCardSkeleton() {
     return (
@@ -61,8 +70,6 @@ export default function AdminDashboard() {
         });
       } catch (error) {
         console.error("Error fetching counts: ", error);
-        // This might fail if list permission is denied, but getCountFromServer is often more lenient.
-        // We will keep the UI robust to this.
         setCounts({ products: 0, orders: 0 });
       } finally {
         setIsCounting(false);
@@ -71,14 +78,6 @@ export default function AdminDashboard() {
 
     fetchCounts();
   }, [firestore, user]);
-
-
-  const recentOrdersQuery = useMemoFirebase(
-    () => (firestore && user ? query(collection(firestore, 'orders_leads'), orderBy('createdAt', 'desc'), limit(5)) : null),
-    [firestore, user]
-  );
-  // Note: This recentOrders query might fail if list permission is denied. The UI should handle this gracefully.
-  const { data: recentOrders, isLoading: recentOrdersLoading, error: recentOrdersError } = useCollection<Order & { createdAt: Timestamp }>(recentOrdersQuery);
     
   const isLoading = isUserLoading || isCounting;
 
@@ -194,32 +193,11 @@ export default function AdminDashboard() {
             <CardHeader>
               <CardTitle>Recent Orders</CardTitle>
               <CardDescription>
-                Displaying last 5 orders.
+                Displaying last 5 dummy orders.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-8">
-              {recentOrdersLoading ? (
-                <>
-                 <div className="flex items-center gap-4">
-                    <Skeleton className="h-9 w-9 rounded-full" />
-                    <div className="grid gap-1 flex-grow">
-                        <Skeleton className="h-4 w-24" />
-                        <Skeleton className="h-3 w-32" />
-                    </div>
-                    <Skeleton className="h-5 w-16" />
-                 </div>
-                 <div className="flex items-center gap-4">
-                    <Skeleton className="h-9 w-9 rounded-full" />
-                    <div className="grid gap-1 flex-grow">
-                        <Skeleton className="h-4 w-24" />
-                        <Skeleton className="h-3 w-32" />
-                    </div>
-                    <Skeleton className="h-5 w-16" />
-                 </div>
-                </>
-              ) : recentOrdersError ? (
-                 <p className="text-sm text-destructive">Could not load recent orders due to permissions.</p>
-              ) : recentOrders?.map(order => (
+              {dummyRecentOrders.map(order => (
                 <div key={order.orderId} className="flex items-center gap-4">
                 <Avatar className="hidden h-9 w-9 sm:flex">
                   <AvatarImage src={`https://avatar.vercel.sh/${order.name}.png`} alt="Avatar" />
@@ -234,7 +212,7 @@ export default function AdminDashboard() {
                   </p>
                 </div>
                 <div className="ml-auto font-medium">
-                    +${order.items.reduce((total, item) => total + item.price * item.quantity, 0).toFixed(2)}
+                    +${order.total.toFixed(2)}
                 </div>
               </div>
               ))}
