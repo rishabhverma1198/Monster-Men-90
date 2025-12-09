@@ -1,115 +1,83 @@
-
 /**
- * This ruleset provides security for the MonserMens90 e-commerce application.
- *
- * Core Philosophy:
- * The security model is designed for a public-facing product catalog with a secure, admin-only management backend.
- * It uses a Role-Based Access Control (RBAC) system where admin privileges are granted by the existence of a document
- * in the `/admins` collection. This allows for secure management of products and orders.
+ * Core Philosophy: This ruleset governs an e-commerce application backend. The security model is
+ * admin-centric, where a specific admin user has full write access to all data, while the general
+ * public (including unauthenticated users) has read-only access to the product catalog.
  *
  * Data Structure:
- * - /products/{productId}: Publicly readable product data.
- *   - /variants/{variantId}: Publicly readable product variants (e.g., sizes).
- * - /orders_leads/{orderId}: Private order data, created by any user (including guests).
- * - /admins/{uid}: A list of admin users, where the document ID is the user's Auth UID.
+ * - /products/{productId}: A public collection of all products.
+ * - /products/{productId}/variants/{variantId}: A public subcollection for product sizes and stock.
+ * - /orders_leads/{orderId}: A private collection for customer orders.
  *
  * Key Security Decisions:
- * - Product Catalog: The entire `/products` collection and its subcollections are publicly readable to allow any visitor
- *   to browse the store. However, all write operations (create, update, delete) are restricted to authenticated admins.
- * - Guest Checkouts: To support users placing orders without creating an account, the `create` operation on `/orders_leads`
- *   is open to everyone.
- * - Order Privacy: Once an order is created, it becomes private. All read and write access (get, list, update, delete)
- *   to the `/orders_leads` collection is strictly limited to admins to protect customer PII.
- * - Admin Management: The ability to grant or revoke admin privileges is restricted to users who are already admins.
- *
- * Denormalization for Authorization:
- * Instead of embedding an `isAdmin` flag in a user profile document (which would require a costly `get()` call in rules),
- * this ruleset uses a dedicated `/admins/{uid}` collection. This allows for a highly performant authorization check
- * using `exists()`, which does not incur a read charge and is optimized for this exact use case.
+ * - Admin-Only Writes: All write operations (create, update, delete) across the entire database
+ *   are restricted to a single, hardcoded admin user UID. This ensures data integrity.
+ * - Public Product Catalog: The `/products` collection and its `variants` subcollections are
+ *   publicly readable and listable to allow any user or guest to browse the store.
+ * - Private Orders: The `/orders_leads` collection is write-only for the public (to place orders)
+ *   and completely restricted from being read or listed by anyone except the admin. This protects
+ *   sensitive customer information like names and phone numbers.
+ * - Guest Checkouts: Order creation is permitted for any user, including anonymous ones, to
+ *   facilitate a simple guest checkout process without requiring user accounts.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --------------------------------
-    // Helper Functions
-    // --------------------------------
+    // Helper functions for readable and reusable logic.
 
     /**
-     * Checks if the user is signed in.
-     */
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    /**
-     * Checks if the currently authenticated user has admin privileges.
-     * Admin status is granted by the existence of a document for the user's UID
-     * in the /admins collection. This is a fast and non-billable check.
+     * Checks if the request is from the designated admin user.
+     * IMPORTANT: Replace 'YOUR_ADMIN_UID_HERE' with the actual Firebase Auth UID of the admin.
      */
     function isAdmin() {
-      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      // TODO: Replace with the actual Firebase Auth UID for the admin account.
+      return request.auth != null && request.auth.uid == 'YOUR_ADMIN_UID_HERE';
     }
 
-    // --------------------------------
-    // Collection Rules
-    // --------------------------------
-
     /**
-     * @description Manages the product catalog. Products are public for all to see, but only admins can create, modify, or delete them.
+     * @description Publicly readable product catalog, manageable only by an admin.
      * @path /products/{productId}
-     * @allow (get) Any user, signed in or not, can view a product.
-     * @deny (create) A non-admin user cannot add a new product.
-     * @principle Public Read with Admin-Only Writes. This protects the integrity of the store's catalog while allowing public browsing.
+     * @allow (get) Any user, authenticated or not, can read a specific product's details.
+     * @deny (create) A non-admin user attempts to create a new product.
+     * @principle Public read access for catalog items with admin-only write control to protect data integrity.
      */
     match /products/{productId} {
       allow get: if true;
       allow list: if true;
       allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-
-      /**
-       * @description Manages product variants (e.g., sizes). Follows the same security model as the parent product.
-       * @path /products/{productId}/variants/{variantId}
-       * @allow (get) Any user can view the available sizes and stock for a product.
-       * @deny (update) A regular signed-in user cannot change the stock level of a variant.
-       * @principle Enforces relational integrity by ensuring a variant's `productId` field matches its parent document path.
-       */
-      match /variants/{variantId} {
-        allow get: if true;
-        allow list: if true;
-        allow create: if isAdmin() && request.resource.data.productId == productId;
-        allow update: if isAdmin() && request.resource.data.productId == productId;
-        allow delete: if isAdmin();
-      }
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
     }
 
     /**
-     * @description Stores order leads from customers. Allows anyone to create an order (guest checkout) but locks down all other access to admins.
+     * @description Publicly readable product variants (e.g., sizes, stock), manageable only by an admin.
+     * @path /products/{productId}/variants/{variantId}
+     * @allow (get) Any user can view the stock or price for a specific product size.
+     * @deny (update) A non-admin user attempts to change the stock level of a variant.
+     * @principle Enforces relational integrity by ensuring a variant is always linked to its parent product.
+     */
+    match /products/{productId}/variants/{variantId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if isAdmin() && request.resource.data.productId == productId;
+      allow update: if isAdmin() && resource != null && request.resource.data.productId == resource.data.productId;
+      allow delete: if isAdmin() && resource != null;
+    }
+
+    /**
+     * @description Stores customer orders. Anyone can create an order (guest checkout),
+     * but only the admin can view or manage them to protect customer privacy.
      * @path /orders_leads/{orderId}
-     * @allow (create) An anonymous guest user can successfully place an order.
-     * @deny (get) A signed-in, non-admin user cannot read another user's order details.
-     * @principle Public Create, Private Read/Manage. This supports guest checkouts while protecting sensitive customer order information (PII).
+     * @allow (create) An unauthenticated guest user successfully places a new order.
+     * @deny (list) An authenticated user attempts to list all orders in the system.
+     * @principle Protects sensitive user data (PII) by making orders write-only for the public and read-only for the admin.
      */
     match /orders_leads/{orderId} {
       allow get: if isAdmin();
       allow list: if isAdmin();
       allow create: if true;
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
-
-    /**
-     * @description Defines which users are administrators. The existence of a document grants the role.
-     * @path /admins/{uid}
-     * @allow (create) An existing admin can add a new document to make another user an admin.
-     * @deny (create) A non-admin user cannot create a document here to grant themselves admin privileges.
-     * @principle Admin-Managed Roles. Ensures that only existing administrators can manage the list of who has administrative access.
-     */
-    match /admins/{uid} {
-      allow read, write: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
     }
   }
 }
-    

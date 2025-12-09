@@ -1,11 +1,10 @@
-
 {
   "entities": {
     "Product": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Product",
       "type": "object",
-      "description": "Represents a product available for sale in the MonserMens90 store.",
+      "description": "Represents a product available for sale in the MonserMens90 e-commerce system.",
       "properties": {
         "id": {
           "type": "string",
@@ -17,7 +16,7 @@
         },
         "category": {
           "type": "string",
-          "description": "The category the product belongs to (Men, Women, etc.)."
+          "description": "The category the product belongs to (e.g., Men, Women)."
         },
         "images": {
           "type": "array",
@@ -28,7 +27,7 @@
         },
         "description": {
           "type": "string",
-          "description": "A detailed description of the product."
+          "description": "Detailed description of the product."
         },
         "price": {
           "type": "number",
@@ -36,7 +35,7 @@
         },
         "tags": {
           "type": "array",
-          "description": "An array of tags associated with the product for search.",
+          "description": "An array of tags associated with the product for search purposes.",
           "items": {
             "type": "string"
           }
@@ -45,19 +44,14 @@
           "type": "string",
           "description": "A URL-friendly slug for the product."
         },
-        "status": {
-            "type": "string",
-            "description": "The status of the product.",
-            "enum": ["active", "inactive"]
-        },
         "createdAt": {
           "type": "string",
-          "description": "Timestamp indicating when the product was created.",
+          "description": "Timestamp of when the product was created.",
           "format": "date-time"
         },
         "updatedAt": {
           "type": "string",
-          "description": "Timestamp indicating when the product was last updated.",
+          "description": "Timestamp of when the product was last updated.",
           "format": "date-time"
         }
       },
@@ -70,82 +64,81 @@
         "price",
         "tags",
         "slug",
-        "status",
         "createdAt",
         "updatedAt"
       ]
     },
-    "Variant": {
+    "ProductVariant": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Variant",
+      "title": "ProductVariant",
       "type": "object",
-      "description": "Represents a specific variant of a product (e.g., size).",
+      "description": "Represents a specific variant of a product (e.g., size) and its stock level.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the variant."
-        },
         "productId": {
           "type": "string",
-          "description": "Reference to Product. (Relationship: Product 1:N Variant)"
+          "description": "Reference to the Product. (Relationship: Product 1:N ProductVariant)"
         },
         "size": {
           "type": "string",
-          "description": "The size of the variant (S, M, L, XL, XXL)."
+          "description": "The size of the product variant (e.g., S, M, L, XL, XXL)."
         },
         "stock": {
           "type": "number",
-          "description": "The current stock level for this variant."
+          "description": "The current stock level of this product variant."
         },
         "price": {
           "type": "number",
-          "description": "The price for this variant."
+          "description": "Price specific to size."
         }
       },
       "required": [
-        "id",
         "productId",
         "size",
         "stock",
         "price"
       ]
     },
-    "OrderLead": {
+    "Order": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "OrderLead",
+      "title": "Order",
       "type": "object",
       "description": "Represents an order placed by a user.",
       "properties": {
-        "orderId": {
+        "id": {
           "type": "string",
           "description": "Unique identifier for the order."
         },
+        "orderId": {
+          "type": "string",
+          "description": "The order ID (e.g., MM90-XXXXXX)."
+        },
         "name": {
           "type": "string",
-          "description": "The name of the user who placed the order."
+          "description": "The name of the customer who placed the order."
         },
         "phone": {
           "type": "string",
-          "description": "The phone number of the user who placed the order."
+          "description": "The phone number of the customer who placed the order."
         },
         "items": {
           "type": "array",
-          "description": "An array of items in the order. Each item should include the productId, quantity and size.",
+          "description": "An array of items in the order. Each item will likely contain a productId and quantity.",
           "items": {
             "type": "string"
           }
         },
         "status": {
           "type": "string",
-          "description": "The current status of the order (Pending, Confirmed, Packed, Shipped, Delivered)."
+          "description": "The status of the order (e.g., Pending, Confirmed, Packed, Shipped, Delivered)."
         },
         "createdAt": {
           "type": "string",
-          "description": "Timestamp indicating when the order was placed.",
+          "description": "Timestamp of when the order was placed.",
           "format": "date-time"
         }
       },
       "required": [
+        "id",
         "orderId",
         "name",
         "phone",
@@ -153,66 +146,69 @@
         "status",
         "createdAt"
       ]
-    },
-    "Admin": {
-      "title": "Admin",
-      "type": "object",
-      "description": "A document that grants admin privileges to a user.",
-      "properties": {
-        "role": {
-          "type": "string",
-          "const": "admin"
-        }
-      },
-      "required": ["role"]
     }
   },
   "auth": {
     "providers": [
       "password",
-      "anonymous",
-      "emailLink"
-    ],
-    "users": [
-      {
-        "email": "admin.monsermens90@gmail.com",
-        "password": "password123",
-        "customClaims": {
-          "admin": true
-        }
-      }
+      "anonymous"
     ]
   },
   "firestore": {
-    "rules": "rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    function isSignedIn() {\n      return request.auth != null;\n    }\n\n    function isAdmin() {\n      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));\n    }\n\n    match /products/{productId} {\n      allow read: if true;\n      allow write: if isAdmin();\n\n      match /variants/{variantId} {\n        allow read: if true;\n        allow write: if isAdmin();\n      }\n    }\n\n    match /orders_leads/{orderId} {\n      allow create: if true;\n      allow read, update, delete: if isAdmin();\n    }\n\n    match /admins/{uid} {\n      allow read, write: if isAdmin();\n    }\n  }\n}\n",
-    "collections": [
+    "structure": [
       {
-        "name": "products",
-        "schema": {
-          "$ref": "#/entities/Product"
-        },
-        "subcollections": [
-          {
-            "name": "variants",
-            "schema": {
-              "$ref": "#/entities/Variant"
+        "path": "products/{productId}",
+        "definition": {
+          "entityName": "Product",
+          "schema": {
+            "$ref": "#/backend/entities/Product"
+          },
+          "description": "Stores product details, including name, category, images, description, price, and tags.",
+          "params": [
+            {
+              "name": "productId",
+              "description": "Unique identifier for the product."
             }
-          }
-        ]
-      },
-      {
-        "name": "orders_leads",
-        "schema": {
-          "$ref": "#/entities/OrderLead"
+          ]
         }
       },
       {
-        "name": "admins",
-        "schema": {
-          "$ref": "#/entities/Admin"
+        "path": "products/{productId}/variants/{variantId}",
+        "definition": {
+          "entityName": "ProductVariant",
+          "schema": {
+            "$ref": "#/backend/entities/ProductVariant"
+          },
+          "description": "Stores product variants (e.g., sizes) and their associated stock levels and prices. The variant ID is the size (S,M,L,...).",
+          "params": [
+            {
+              "name": "productId",
+              "description": "Unique identifier for the product."
+            },
+            {
+              "name": "variantId",
+              "description": "The product variant size (S, M, L, XL, XXL)."
+            }
+          ]
+        }
+      },
+      {
+        "path": "orders_leads/{orderId}",
+        "definition": {
+          "entityName": "Order",
+          "schema": {
+            "$ref": "#/backend/entities/Order"
+          },
+          "description": "Stores order details including name, phone, items, status, and createdAt. The orderId is a unique identifier for the order (MM90-XXXXXX).",
+          "params": [
+            {
+              "name": "orderId",
+              "description": "Unique identifier for the order."
+            }
+          ]
         }
       }
-    ]
+    ],
+    "reasoning": "The Firestore structure is designed to support the MonserMens90 e-commerce application, focusing on product presentation, order placement, and admin management. Key considerations include: \n\n1.  **Authorization Independence:** Since there are no user accounts (besides the admin), ownership isn't applicable to general users. Orders are linked to user information (name, phone) and the admin manages them.  There is no need to denormalize authorization data, because access to collections is not dependent on the user.\n2.  **Structural Segregation:** The `products` collection stores product details, with a subcollection `variants` to handle size-specific stock and pricing. `orders_leads` stores order information. Segregation ensures that access rules (if needed in the future) can be applied distinctly to product data and order data.\n3.  **Access Modeling:** Products can be listed by anyone, and there are no user-specific permissions needed for access. Only admin has write access.\n4. **QAPs**: The structure supports listing products and orders. The `products` collection allows listing all products for the storefront. The `orders_leads` collection enables the admin to view and manage all orders.  Since there are no user accounts, there are no QAPs to consider regarding user-specific access.\n\nThis design prioritizes simplicity given the limited authorization needs of the application."
   }
 }
-    
