@@ -3,27 +3,25 @@
 
 import type { CartItem, Order } from "@/lib/types";
 import { collection, doc, setDoc, serverTimestamp, getDocs, query, where, Timestamp } from "firebase/firestore";
-import { initializeApp, getApps } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth, signInAnonymously } from "firebase/auth";
 import { firebaseConfig } from "@/firebase/config";
 
 
-interface OrderInput {
-  name: string;
-  phone: string;
-  items: CartItem[];
-  status: Order["status"];
-}
-
 // This function needs its own separate Firebase initialization
 // because Server Actions run in a separate environment.
 async function getFirebaseInstances() {
+    // Check if any app is already initialized
     if (!getApps().length) {
+        // If not, initialize with the config
         initializeApp(firebaseConfig);
     }
-    const db = getFirestore();
-    const auth = getAuth();
+    // Get the (now initialized) app and its services
+    const app = getApp();
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
     // Ensure we have an authenticated user for server actions
     if (!auth.currentUser) {
         await signInAnonymously(auth);
