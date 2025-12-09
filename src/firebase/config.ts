@@ -1,6 +1,8 @@
 import { FirebaseOptions } from 'firebase/app';
 
 // This configuration is used for both client-side and server-side initialization.
+// IMPORTANT: This is a fallback config for development. In production,
+// Firebase App Hosting provides the configuration automatically.
 export const firebaseConfig: FirebaseOptions = {
   apiKey: "AIzaSyAVzSS8s80QLWkCGr_oCqdEzVPypsFVfPs",
   authDomain: "studio-5245058318-ccc15.firebaseapp.com",

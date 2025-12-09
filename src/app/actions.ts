@@ -12,13 +12,18 @@ import { firebaseConfig } from "@/firebase/config";
 // This function needs its own separate Firebase initialization
 // because Server Actions run in a separate environment.
 async function getFirebaseInstances() {
-    // Check if any app is already initialized
+    let app;
     if (!getApps().length) {
-        // If not, initialize with the config
-        initializeApp(firebaseConfig);
+      try {
+        app = initializeApp();
+      } catch (e) {
+        console.warn('Automatic initialization failed. Falling back to firebase config object.', e);
+        app = initializeApp(firebaseConfig);
+      }
+    } else {
+      app = getApp();
     }
-    // Get the (now initialized) app and its services
-    const app = getApp();
+    
     const db = getFirestore(app);
     const auth = getAuth(app);
 
@@ -30,7 +35,7 @@ async function getFirebaseInstances() {
 }
 
 
-export async function createOrder(orderInput: OrderInput): Promise<{ success: boolean; orderId?: string; error?: string }> {
+export async function createOrder(orderInput: any): Promise<{ success: boolean; orderId?: string; error?: string }> {
   try {
     const { db } = await getFirebaseInstances();
 
