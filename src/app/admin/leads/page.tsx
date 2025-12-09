@@ -32,28 +32,6 @@ interface Lead {
     totalSpent: number;
 }
 
-const getLeadsFromOrders = (orders: (Order & { createdAt: Timestamp })[] | null): Lead[] => {
-  if (!orders) return [];
-  const leadsMap = new Map<string, Lead>();
-
-  orders.forEach(order => {
-    const total = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const existingLead = leadsMap.get(order.phone);
-    if (existingLead) {
-      existingLead.orderIds.push(order.orderId);
-      existingLead.totalSpent += total;
-    } else {
-      leadsMap.set(order.phone, {
-        name: order.name,
-        phone: order.phone,
-        orderIds: [order.orderId],
-        totalSpent: total,
-      });
-    }
-  });
-
-  return Array.from(leadsMap.values()).sort((a, b) => b.totalSpent - a.totalSpent);
-};
 
 function LeadRowSkeleton() {
     return (
@@ -74,8 +52,31 @@ export default function LeadsPage() {
     () => (firestore && user ? query(collection(firestore, 'orders_leads'), orderBy('createdAt', 'desc')) : null),
     [firestore, user]
   );
-  const { data: orders, isLoading } = useCollection<Order & { createdAt: Timestamp }>(ordersQuery);
-  const leads = useMemo(() => getLeadsFromOrders(orders), [orders]);
+  // This hook will now likely return an error due to tightened security rules, which is expected.
+  const { data: orders, isLoading, error } = useCollection<Order & { createdAt: Timestamp }>(ordersQuery);
+
+  const leads = useMemo(() => {
+    if (!orders) return [];
+    const leadsMap = new Map<string, Lead>();
+
+    orders.forEach(order => {
+      const total = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+      const existingLead = leadsMap.get(order.phone);
+      if (existingLead) {
+        existingLead.orderIds.push(order.orderId);
+        existingLead.totalSpent += total;
+      } else {
+        leadsMap.set(order.phone, {
+          name: order.name,
+          phone: order.phone,
+          orderIds: [order.orderId],
+          totalSpent: total,
+        });
+      }
+    });
+
+    return Array.from(leadsMap.values()).sort((a, b) => b.totalSpent - a.totalSpent);
+  }, [orders]);
   
   const dataLoading = isLoading || isUserLoading;
 
@@ -89,7 +90,7 @@ export default function LeadsPage() {
         <CardHeader>
           <CardTitle>Customer Leads</CardTitle>
           <CardDescription>
-            Manage and interact with customers who have placed orders.
+            This page is disabled because it requires listing all orders, which is not permitted by the current security rules.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -108,41 +109,17 @@ export default function LeadsPage() {
                 <>
                     <LeadRowSkeleton />
                     <LeadRowSkeleton />
-                    <LeadRowSkeleton />
-                    <LeadRowSkeleton />
                 </>
-              ) : leads.length > 0 ? (
-                leads.map((lead) => (
-                  <TableRow key={lead.phone}>
-                    <TableCell className="font-medium">{lead.name}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Phone className="h-4 w-4 text-muted-foreground" />
-                        <span>{lead.phone}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                        <Badge variant="secondary">{lead.orderIds.length}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">${lead.totalSpent.toFixed(2)}</TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex justify-center items-center gap-2">
-                        <Button variant="outline" size="sm">
-                           <CheckCircle className="mr-2 h-4 w-4" />
-                           Contacted
-                        </Button>
-                        <Button variant="destructive" size="sm">
-                          <Ban className="mr-2 h-4 w-4" />
-                           Blacklist
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+              ) : error ? (
+                 <TableRow>
+                  <TableCell colSpan={5} className="h-24 text-center text-destructive">
+                    Could not load leads. You don't have permission to list all orders.
+                  </TableCell>
+                </TableRow>
               ) : (
                 <TableRow>
                   <TableCell colSpan={5} className="h-24 text-center">
-                    No leads found.
+                    Lead functionality is currently disabled.
                   </TableCell>
                 </TableRow>
               )}

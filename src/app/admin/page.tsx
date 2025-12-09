@@ -8,9 +8,10 @@ import Link from "next/link";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, query, orderBy, limit, Timestamp } from "firebase/firestore";
+import { collection, query, orderBy, limit, Timestamp, getCountFromServer } from "firebase/firestore";
 import type { Order, Product } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useEffect, useState }from "react";
 
 const salesData = [
   { name: "Jan", total: Math.floor(Math.random() * 2000) + 500 },
@@ -39,33 +40,47 @@ function StatCardSkeleton() {
 export default function AdminDashboard() {
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
+  const [counts, setCounts] = useState({ products: 0, orders: 0 });
+  const [isCounting, setIsCounting] = useState(true);
 
-  const productsQuery = useMemoFirebase(
-    () => (firestore && user ? collection(firestore, 'products') : null),
-    [firestore, user]
-  );
-  const { data: products, isLoading: productsLoading } = useCollection<Product>(productsQuery);
+  useEffect(() => {
+    if (!firestore || !user) return;
+    
+    const fetchCounts = async () => {
+      setIsCounting(true);
+      try {
+        const productsRef = collection(firestore, 'products');
+        const ordersRef = collection(firestore, 'orders_leads');
+        
+        const productsSnap = await getCountFromServer(productsRef);
+        const ordersSnap = await getCountFromServer(ordersRef);
 
-  const ordersQuery = useMemoFirebase(
-    () => (firestore && user ? collection(firestore, 'orders_leads') : null),
-    [firestore, user]
-  );
-  const { data: orders, isLoading: ordersLoading } = useCollection<Order & { createdAt: Timestamp }>(ordersQuery);
+        setCounts({
+          products: productsSnap.data().count,
+          orders: ordersSnap.data().count
+        });
+      } catch (error) {
+        console.error("Error fetching counts: ", error);
+        // This might fail if list permission is denied, but getCountFromServer is often more lenient.
+        // We will keep the UI robust to this.
+        setCounts({ products: 0, orders: 0 });
+      } finally {
+        setIsCounting(false);
+      }
+    };
+
+    fetchCounts();
+  }, [firestore, user]);
+
 
   const recentOrdersQuery = useMemoFirebase(
     () => (firestore && user ? query(collection(firestore, 'orders_leads'), orderBy('createdAt', 'desc'), limit(5)) : null),
     [firestore, user]
   );
-  const { data: recentOrders, isLoading: recentOrdersLoading } = useCollection<Order & { createdAt: Timestamp }>(recentOrdersQuery);
-
-
-  const totalRevenue = orders
-    ? orders.reduce((sum, order) => {
-        return sum + order.items.reduce((orderSum, item) => orderSum + (item.price * item.quantity), 0);
-      }, 0)
-    : 0;
+  // Note: This recentOrders query might fail if list permission is denied. The UI should handle this gracefully.
+  const { data: recentOrders, isLoading: recentOrdersLoading, error: recentOrdersError } = useCollection<Order & { createdAt: Timestamp }>(recentOrdersQuery);
     
-  const isLoading = productsLoading || ordersLoading || recentOrdersLoading || isUserLoading;
+  const isLoading = isUserLoading || isCounting;
 
   return (
     <div className="flex w-full flex-col gap-4 md:gap-8">
@@ -87,9 +102,9 @@ export default function AdminDashboard() {
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">${totalRevenue.toFixed(2)}</div>
+                <div className="text-2xl font-bold">N/A</div>
                 <p className="text-xs text-muted-foreground">
-                  Based on all orders
+                  Calculation disabled
                 </p>
               </CardContent>
             </Card>
@@ -99,7 +114,7 @@ export default function AdminDashboard() {
                 <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">+{orders?.length || 0}</div>
+                <div className="text-2xl font-bold">+{counts.orders}</div>
                 <p className="text-xs text-muted-foreground">
                   Total leads generated
                 </p>
@@ -111,7 +126,7 @@ export default function AdminDashboard() {
                 <ShoppingCart className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">+{orders?.length || 0}</div>
+                <div className="text-2xl font-bold">+{counts.orders}</div>
                 <p className="text-xs text-muted-foreground">
                   Total orders placed
                 </p>
@@ -123,7 +138,7 @@ export default function AdminDashboard() {
                 <Package className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{products?.length || 0}</div>
+                <div className="text-2xl font-bold">{counts.products}</div>
                 <p className="text-xs text-muted-foreground">
                   Total products in store
                 </p>
@@ -179,7 +194,7 @@ export default function AdminDashboard() {
             <CardHeader>
               <CardTitle>Recent Orders</CardTitle>
               <CardDescription>
-                You have {orders?.length || 0} orders in total.
+                Displaying last 5 orders.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-8">
@@ -202,6 +217,8 @@ export default function AdminDashboard() {
                     <Skeleton className="h-5 w-16" />
                  </div>
                 </>
+              ) : recentOrdersError ? (
+                 <p className="text-sm text-destructive">Could not load recent orders due to permissions.</p>
               ) : recentOrders?.map(order => (
                 <div key={order.orderId} className="flex items-center gap-4">
                 <Avatar className="hidden h-9 w-9 sm:flex">

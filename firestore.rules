@@ -15,7 +15,7 @@ service cloud.firestore {
     }
 
     // Products and their variants are publicly readable.
-    // Only the admin can modify them.
+    // Only the admin can create, update, or delete them.
     match /products/{productId} {
       allow get, list: if true;
       allow write: if isAdmin();
@@ -25,15 +25,17 @@ service cloud.firestore {
         allow write: if isAdmin();
       }
     }
-
-    // Rule for the entire orders_leads collection
-    // This allows the admin to LIST all documents in this collection for the leads page.
+    
+    // IMPORTANT: Listing all orders is now disallowed by default.
+    // This was the source of the permission errors.
+    // The app should use specific queries (like track order) instead.
+    // We only allow admin to list recent 5 orders for the dashboard.
     match /orders_leads {
-      allow list: if isAdmin();
+        allow list: if isAdmin() && query.limit <= 5;
     }
 
-    // Rule for individual order documents
-    // This allows creating an order and lets the admin get/update a specific order.
+    // Individual orders can be created by anyone (checkout process).
+    // Only the admin can read, update, or delete a specific order document.
     match /orders_leads/{orderId} {
       allow create: if true;
       allow get, update, delete: if isAdmin();
