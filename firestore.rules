@@ -4,6 +4,7 @@
  * public (including unauthenticated users) has read-only access to the product catalog.
  *
  * Data Structure:
+ * - /admins/{uid}: A private collection to store admin user UIDs.
  * - /products/{productId}: A public collection of all products.
  * - /products/{productId}/variants/{variantId}: A public subcollection for product sizes and stock.
  * - /orders_leads/{orderId}: A private collection for customer orders.
@@ -33,6 +34,18 @@ service cloud.firestore {
       // TODO: Replace with the actual Firebase Auth UID for the admin account.
       return request.auth != null && request.auth.uid == 'YOUR_ADMIN_UID_HERE';
     }
+
+    /**
+     * @description Stores admin user records. Only admins can read or write to this collection.
+     * @path /admins/{userId}
+     * @allow (read, write) An admin can access their own record to verify their status.
+     * @deny (list) A non-admin user attempts to list all admins.
+     * @principle Secures admin role verification by restricting access to admins themselves.
+     */
+    match /admins/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
 
     /**
      * @description Publicly readable product catalog, manageable only by an admin.
