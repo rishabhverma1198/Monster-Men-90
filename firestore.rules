@@ -80,7 +80,14 @@ service cloud.firestore {
      */
     match /orders_leads/{orderId} {
       allow create: if true;
-      allow get, list, update, delete: if isAdmin();
+      allow get, update, delete: if isAdmin();
+    }
+
+    // This rule specifically allows the admin to LIST the entire 'orders_leads' collection.
+    // This is separate from the rule above because 'list' applies to the collection path,
+    // not the individual document path.
+    match /orders_leads {
+      allow list: if isAdmin();
     }
   }
 }
