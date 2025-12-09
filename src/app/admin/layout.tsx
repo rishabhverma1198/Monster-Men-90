@@ -34,14 +34,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useAuth, useUser, useFirestore } from "@/firebase";
+import { useAuth, useUser, useFirestore, setDocumentNonBlocking } from "@/firebase";
 import { useEffect, useState } from "react";
-import { signOut } from "firebase/auth";
+import { signOut, createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 type AuthState = "loading" | "authenticated" | "unauthenticated" | "not-admin" | "error";
-type VerificationStep = "Verifying Login" | "Checking Admin Privileges" | "Done";
+type VerificationStep = "Verifying Login" | "Checking Admin Privileges" | "Creating Admin User" | "Done";
 
 export default function AdminLayout({
   children,
@@ -87,14 +87,24 @@ export default function AdminLayout({
           setAuthState("authenticated");
           setVerificationStep("Done");
         } else {
-          console.log("[AdminLayout] State: NOT-ADMIN - Admin document does not exist. Signing out and redirecting.");
-          await signOut(auth);
-          setAuthState("not-admin"); // Set state after signout
-          router.replace("/admin/login?error=not-admin");
+            // MANUAL ADMIN CREATION FAILSAFE
+            // If the logged-in user is the one from our config but not in the 'admins' table, create it.
+            if (user.email === "admin.monsermens90@gmail.com") {
+                console.log("[AdminLayout] User is default admin email, but not in 'admins' collection. Creating admin entry...");
+                setVerificationStep("Creating Admin User");
+                const adminData = { isAdmin: true, createdAt: new Date() };
+                await setDoc(adminDocRef, adminData); // Using await here is crucial for this step
+                console.log("[AdminLayout] Admin entry created. Re-checking status.");
+                checkAdminStatus(); // Re-run the check
+            } else {
+                console.log("[AdminLayout] State: NOT-ADMIN - Admin document does not exist. Signing out and redirecting.");
+                await signOut(auth);
+                setAuthState("not-admin");
+                router.replace("/admin/login?error=not-admin");
+            }
         }
       } catch (error: any) {
          console.error("[AdminLayout] CRITICAL ERROR while checking admin status:", error);
-         // Sign out the user to prevent potential loops if they are stuck
          await signOut(auth);
          setAuthState("error");
          setErrorMessage(`Firestore error: ${error.message}. You have been logged out. Check console and Firestore rules.`);
@@ -150,7 +160,6 @@ export default function AdminLayout({
     );
   }
   
-  // Render the actual admin layout if authenticated
   return (
     <SidebarProvider>
       <div className="flex min-h-screen">
@@ -241,4 +250,6 @@ export default function AdminLayout({
     </SidebarProvider>
   );
 }
+    
+
     

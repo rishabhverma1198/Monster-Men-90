@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Package2, Loader2, Terminal, MailCheck, AlertCircle, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/firebase";
-import { signInWithEmailAndPassword, sendPasswordResetEmail, sendSignInLinkToEmail } from "firebase/auth";
+import { signInWithEmailAndPassword, sendPasswordResetEmail, sendSignInLinkToEmail, createUserWithEmailAndPassword } from "firebase/auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
@@ -54,7 +54,20 @@ export default function AdminLoginPage() {
             await signInWithEmailAndPassword(auth, email, password);
             router.push("/admin");
         } catch (err: any) {
-            handleAuthError(err);
+             if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+                // User doesn't exist, so create them
+                console.log("User not found, attempting to create a new user...");
+                try {
+                    await createUserWithEmailAndPassword(auth, email, password);
+                    console.log("User created successfully. Redirecting to admin...");
+                    // The AdminLayout will handle adding them to the 'admins' collection.
+                    router.push("/admin");
+                } catch (creationError: any) {
+                    handleAuthError(creationError);
+                }
+            } else {
+                handleAuthError(err);
+            }
         } finally {
             setIsLoading(false);
         }
@@ -112,7 +125,7 @@ export default function AdminLoginPage() {
     }
 
     const handleAuthError = (err: any) => {
-        console.error("Login Error: ", err); // Added for debugging
+        console.error("Login/Signup Error: ", err); // Added for debugging
         switch(err.code) {
             case "auth/user-not-found":
             case "auth/wrong-password":
@@ -121,6 +134,9 @@ export default function AdminLoginPage() {
                 break;
             case "auth/invalid-email":
                 setError("Please enter a valid email address.");
+                break;
+            case "auth/email-already-in-use":
+                setError("This email is already in use. Please try logging in or reset your password.");
                 break;
             default:
                 setError(`An unexpected error occurred: ${err.message}. Please try again.`);
@@ -154,9 +170,9 @@ export default function AdminLoginPage() {
                 <CardContent>
                     <Alert variant="default" className="mb-4 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
                         <AlertCircle className="h-4 w-4 text-blue-600" />
-                        <AlertTitle className="text-blue-800 dark:text-blue-300">How to Login & Become an Admin</AlertTitle>
+                        <AlertTitle className="text-blue-800 dark:text-blue-300">How to Login</AlertTitle>
                         <AlertDescription className="text-blue-700 dark:text-blue-400">
-                            Use email: <strong>admin.monsermens90@gmail.com</strong> and password: <strong>password123</strong> to log in. To add other admins, go to your Firebase Console, create a user in Authentication, then in Firestore create a collection named `admins`, and add a document where the Document ID is the user's UID.
+                            Use email: <strong>admin.monsermens90@gmail.com</strong> and password: <strong>password123</strong>. If the user doesn't exist, it will be automatically created for you on the first login attempt.
                         </AlertDescription>
                     </Alert>
                     <form onSubmit={handleLogin} className="space-y-4">
@@ -213,7 +229,7 @@ export default function AdminLoginPage() {
                         </div>
                         <Button type="submit" className="w-full" disabled={isLoading}>
                             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Sign In
+                            Sign In / Sign Up
                         </Button>
                     </form>
                 </CardContent>
@@ -258,3 +274,5 @@ export default function AdminLoginPage() {
     </div>
   );
 }
+
+    
