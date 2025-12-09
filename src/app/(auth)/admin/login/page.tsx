@@ -93,7 +93,7 @@ export default function AdminLoginPage() {
             await sendSignInLinkToEmail(auth, email, actionCodeSettings);
             window.localStorage.setItem('emailForSignIn', email);
             setSuccessMessage("A login link has been sent to your email address.");
-        } catch (err: any) => {
+        } catch (err: any) {
             handleAuthError(err);
         } finally {
             setIsLoading(false);
