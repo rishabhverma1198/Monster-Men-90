@@ -8,7 +8,7 @@ import Link from "next/link";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, query, orderBy, limit } from "firebase/firestore";
+import { collection, query, orderBy, limit, Timestamp } from "firebase/firestore";
 import type { Order, Product } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -50,13 +50,13 @@ export default function AdminDashboard() {
     () => (firestore && user ? collection(firestore, 'orders_leads') : null),
     [firestore, user]
   );
-  const { data: orders, isLoading: ordersLoading } = useCollection<Order>(ordersQuery);
+  const { data: orders, isLoading: ordersLoading } = useCollection<Order & { createdAt: Timestamp }>(ordersQuery);
 
   const recentOrdersQuery = useMemoFirebase(
     () => (firestore && user ? query(collection(firestore, 'orders_leads'), orderBy('createdAt', 'desc'), limit(5)) : null),
     [firestore, user]
   );
-  const { data: recentOrders, isLoading: recentOrdersLoading } = useCollection<Order>(recentOrdersQuery);
+  const { data: recentOrders, isLoading: recentOrdersLoading } = useCollection<Order & { createdAt: Timestamp }>(recentOrdersQuery);
 
 
   const totalRevenue = orders

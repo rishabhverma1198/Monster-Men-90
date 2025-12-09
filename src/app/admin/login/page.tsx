@@ -12,7 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Package2, Loader2, Terminal, MailCheck } from "lucide-react";
+import { Package2, Loader2, Terminal, MailCheck, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/firebase";
 import { signInWithEmailAndPassword, sendPasswordResetEmail, sendSignInLinkToEmail } from "firebase/auth";
@@ -150,12 +150,19 @@ export default function AdminLoginPage() {
                     <CardTitle>Sign in with Password</CardTitle>
                 </CardHeader>
                 <CardContent>
+                    <Alert variant="default" className="mb-4 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+                        <AlertCircle className="h-4 w-4 text-blue-600" />
+                        <AlertTitle className="text-blue-800 dark:text-blue-300">How to become an Admin</AlertTitle>
+                        <AlertDescription className="text-blue-700 dark:text-blue-400">
+                            After signing up, go to your Firebase Console. In Firestore, create a collection named `admins`, and add a document where the Document ID is your User UID from Firebase Authentication.
+                        </AlertDescription>
+                    </Alert>
                     <form onSubmit={handleLogin} className="space-y-4">
                         {notAdminError && !error && (
                             <Alert variant="destructive">
                                 <Terminal className="h-4 w-4" />
                                 <AlertTitle>Access Denied</AlertTitle>
-                                <AlertDescription>You do not have permission to access the admin panel.</AlertDescription>
+                                <AlertDescription>You do not have permission to access the admin panel. Make sure your UID is in the 'admins' collection.</AlertDescription>
                             </Alert>
                         )}
                         {error && (
@@ -232,5 +239,3 @@ export default function AdminLoginPage() {
     </div>
   );
 }
-
-    

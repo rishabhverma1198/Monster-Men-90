@@ -110,29 +110,33 @@ export default function AdminProductsPage() {
     const variantsRef = collection(firestore, 'products', productToDelete.id, 'variants');
 
     try {
-        // Batch delete variants
-        const variantsSnapshot = await getDocs(variantsRef);
         const batch = writeBatch(firestore);
-        variantsSnapshot.forEach(doc => {
-            batch.delete(doc.ref);
+        
+        // 1. Get all variants to delete them
+        const variantsSnapshot = await getDocs(variantsRef);
+        variantsSnapshot.forEach(variantDoc => {
+            batch.delete(variantDoc.ref);
         });
+
+        // 2. Delete the main product document
+        batch.delete(productRef);
+
+        // 3. Commit all Firestore deletions
         await batch.commit();
 
-        // Delete images from Storage
+        // 4. Delete images from Storage after successful Firestore deletion
         const storage = getStorage();
         for (const imageUrl of productToDelete.images) {
             try {
                 const imageRef = ref(storage, imageUrl);
                 await deleteObject(imageRef);
             } catch (storageError: any) {
+                // Log if image deletion fails, but don't block the UI toast
                 if (storageError.code !== 'storage/object-not-found') {
                     console.warn(`Could not delete image ${imageUrl}:`, storageError);
                 }
             }
         }
-
-        // Delete the product document itself
-        await deleteDoc(productRef);
 
         toast({
             title: "Product Deleted",
@@ -140,8 +144,9 @@ export default function AdminProductsPage() {
         });
 
     } catch (error) {
+        console.error("Error deleting product:", error)
         const permissionError = new FirestorePermissionError({
-            path: productRef.path,
+            path: productRef.path, // This is a good approximation for the batch
             operation: 'delete',
         });
         errorEmitter.emit('permission-error', permissionError);
@@ -216,6 +221,7 @@ export default function AdminProductsPage() {
                       <ProductRowSkeleton />
                       <ProductRowSkeleton />
                       <ProductRowSkeleton />
+                      <ProductRowSkeleton />
                     </>
                   ) : filteredProducts && filteredProducts.length > 0 ? (
                     filteredProducts.map(product => (
@@ -254,7 +260,7 @@ export default function AdminProductsPage() {
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
               This action cannot be undone. This will permanently delete the product
-              "{productToDelete?.name}" and all its data from our servers.
+              "{productToDelete?.name}" and all its associated data (variants, etc.) from the database.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -275,8 +281,11 @@ export default function AdminProductsPage() {
 // Memoized row component to avoid re-rendering every row on filter change
 const ProductRow = memo(function ProductRow({ product, onSelectDelete }: { product: Product & { createdAt: Timestamp }, onSelectDelete: (product: Product) => void}) {
     const firestore = useFirestore();
-    const variantsCollection = useMemoFirebase(() => (firestore ? collection(firestore, 'products', product.id, 'variants') : null), [firestore, product.id]);
+    const user = useUser();
+
+    const variantsCollection = useMemoFirebase(() => (firestore && user.user ? collection(firestore, 'products', product.id, 'variants') : null), [firestore, product.id, user.user]);
     const { data: variants } = useCollection<ProductVariant>(variantsCollection);
+    
     const hasStock = variants ? variants.some(v => v.stock > 0) : false;
 
     return (

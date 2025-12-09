@@ -21,8 +21,9 @@ import { Button } from "@/components/ui/button";
 import { Phone, Ban, CheckCircle } from "lucide-react";
 import type { Order } from "@/lib/types";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection } from "firebase/firestore";
+import { collection, query, orderBy, Timestamp } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useMemo } from "react";
 
 interface Lead {
     name: string;
@@ -31,8 +32,7 @@ interface Lead {
     totalSpent: number;
 }
 
-// In a real app, this data would be derived and aggregated from the orders collection.
-const getLeadsFromOrders = (orders: Order[] | null): Lead[] => {
+const getLeadsFromOrders = (orders: (Order & { createdAt: Timestamp })[] | null): Lead[] => {
   if (!orders) return [];
   const leadsMap = new Map<string, Lead>();
 
@@ -52,7 +52,7 @@ const getLeadsFromOrders = (orders: Order[] | null): Lead[] => {
     }
   });
 
-  return Array.from(leadsMap.values());
+  return Array.from(leadsMap.values()).sort((a, b) => b.totalSpent - a.totalSpent);
 };
 
 function LeadRowSkeleton() {
@@ -71,11 +71,11 @@ export default function LeadsPage() {
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
   const ordersQuery = useMemoFirebase(
-    () => (firestore && user ? collection(firestore, 'orders_leads') : null),
+    () => (firestore && user ? query(collection(firestore, 'orders_leads'), orderBy('createdAt', 'desc')) : null),
     [firestore, user]
   );
-  const { data: orders, isLoading } = useCollection<Order>(ordersQuery);
-  const leads = getLeadsFromOrders(orders);
+  const { data: orders, isLoading } = useCollection<Order & { createdAt: Timestamp }>(ordersQuery);
+  const leads = useMemo(() => getLeadsFromOrders(orders), [orders]);
   
   const dataLoading = isLoading || isUserLoading;
 
@@ -106,6 +106,7 @@ export default function LeadsPage() {
             <TableBody>
               {dataLoading ? (
                 <>
+                    <LeadRowSkeleton />
                     <LeadRowSkeleton />
                     <LeadRowSkeleton />
                     <LeadRowSkeleton />

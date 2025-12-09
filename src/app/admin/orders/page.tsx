@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/select";
 import type { Order } from "@/lib/types";
 import { useCollection, useFirestore, useMemoFirebase, useUser, errorEmitter, FirestorePermissionError } from "@/firebase";
-import { collection, doc, updateDoc, Timestamp } from "firebase/firestore";
+import { collection, doc, updateDoc, Timestamp, query, orderBy } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 
@@ -56,7 +56,7 @@ export default function OrdersPage() {
   const { toast } = useToast();
 
   const ordersQuery = useMemoFirebase(
-    () => (firestore && user ? collection(firestore, 'orders_leads') : null),
+    () => (firestore && user ? query(collection(firestore, 'orders_leads'), orderBy('createdAt', 'desc')) : null),
     [firestore, user]
   );
   
@@ -118,6 +118,8 @@ export default function OrdersPage() {
             <TableBody>
               {dataLoading ? (
                 <>
+                  <OrderRowSkeleton />
+                  <OrderRowSkeleton />
                   <OrderRowSkeleton />
                   <OrderRowSkeleton />
                   <OrderRowSkeleton />

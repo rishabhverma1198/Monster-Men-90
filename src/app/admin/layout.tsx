@@ -21,6 +21,8 @@ import {
   LogOut,
   Loader2,
   ShieldAlert,
+  Server,
+  UserCheck,
 } from "lucide-react";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -42,6 +44,7 @@ import { useFirestore } from "@/firebase";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 type AuthState = "loading" | "authenticated" | "unauthenticated" | "not-admin";
+type VerificationStep = "Verifying Login" | "Checking Admin Privileges" | "Done";
 
 export default function AdminLayout({
   children,
@@ -53,34 +56,40 @@ export default function AdminLayout({
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
   const [authState, setAuthState] = useState<AuthState>("loading");
+  const [verificationStep, setVerificationStep] = useState<VerificationStep>("Verifying Login");
 
   useEffect(() => {
     if (isUserLoading || !firestore) {
-      // Still waiting for Firebase services to initialize
       setAuthState("loading");
+      setVerificationStep("Verifying Login");
       return;
     }
 
     if (!user) {
-      // No user found, redirect to login
       router.replace("/admin/login");
       setAuthState("unauthenticated");
       return;
     }
 
-    // User is authenticated, now check if they are an admin
+    setVerificationStep("Checking Admin Privileges");
     const checkAdminStatus = async () => {
-      const adminDocRef = doc(firestore, "admins", user.uid);
-      const adminDoc = await getDoc(adminDocRef);
+      try {
+        const adminDocRef = doc(firestore, "admins", user.uid);
+        const adminDoc = await getDoc(adminDocRef);
 
-      if (adminDoc.exists()) {
-        // User is an admin
-        setAuthState("authenticated");
-      } else {
-        // User is not an admin, sign them out and redirect
-        setAuthState("not-admin");
-        await signOut(auth);
-        router.replace("/admin/login?error=not-admin");
+        if (adminDoc.exists()) {
+          setAuthState("authenticated");
+          setVerificationStep("Done");
+        } else {
+          setAuthState("not-admin");
+          if (auth) await signOut(auth);
+          router.replace("/admin/login?error=not-admin");
+        }
+      } catch (error) {
+         console.error("Error checking admin status:", error);
+         setAuthState("not-admin");
+         if (auth) await signOut(auth);
+         router.replace("/admin/login?error=firestore-error");
       }
     };
 
@@ -95,26 +104,35 @@ export default function AdminLayout({
   };
 
   if (authState !== "authenticated") {
-    // Show a loading screen or an error message while checking auth
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
-        {authState === "loading" && <Loader2 className="h-8 w-8 animate-spin" />}
-        {authState === "not-admin" && (
-          <div className="w-full max-w-md p-4">
-            <Alert variant="destructive">
-              <ShieldAlert className="h-4 w-4" />
-              <AlertTitle>Access Denied</AlertTitle>
-              <AlertDescription>
-                You are not authorized to view this page. Redirecting to login...
-              </AlertDescription>
-            </Alert>
-          </div>
-        )}
+        <div className="w-full max-w-md p-4 space-y-4">
+            {authState === "loading" && (
+                <div className="flex flex-col items-center justify-center gap-4 p-8 rounded-lg border">
+                    <div className="flex items-center gap-3 text-lg font-semibold">
+                        {verificationStep === "Verifying Login" ? <Loader2 className="h-5 w-5 animate-spin" /> : <UserCheck className="h-5 w-5 text-green-500"/>}
+                        <span>Verifying Login</span>
+                    </div>
+                     <div className="flex items-center gap-3 text-lg font-semibold text-muted-foreground">
+                        {verificationStep === "Checking Admin Privileges" ? <Loader2 className="h-5 w-5 animate-spin" /> : <Server className="h-5 w-5"/>}
+                        <span>Checking Admin Privileges</span>
+                    </div>
+                </div>
+            )}
+            {authState === "not-admin" && (
+                <Alert variant="destructive">
+                  <ShieldAlert className="h-4 w-4" />
+                  <AlertTitle>Access Denied</AlertTitle>
+                  <AlertDescription>
+                    You are not authorized to view this page. Redirecting to login...
+                  </AlertDescription>
+                </Alert>
+            )}
+        </div>
       </div>
     );
   }
   
-  // AuthState is "authenticated"
   return (
     <SidebarProvider>
       <div className="flex min-h-screen">
@@ -174,7 +192,7 @@ export default function AdminLayout({
           <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
             <SidebarTrigger className="md:hidden" />
             <div className="ml-auto">
-              <DropdownMenu>
+              {user && <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="rounded-full">
                     <Avatar className="h-8 w-8">
@@ -196,7 +214,7 @@ export default function AdminLayout({
                     <span>Logout</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
-              </DropdownMenu>
+              </DropdownMenu>}
             </div>
           </header>
           <main className="flex-1 flex flex-col p-4 sm:p-6">{children}</main>

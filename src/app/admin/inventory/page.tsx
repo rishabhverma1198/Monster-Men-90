@@ -57,41 +57,48 @@ export default function InventoryPage() {
   const { data: products, isLoading: productsLoading } = useCollection<Product>(productsQuery);
 
   useEffect(() => {
-    if (products && firestore && user) {
-      const fetchAllVariants = async () => {
-        setIsDerivingInventory(true);
-        const allItems: InventoryItem[] = [];
-        try {
-          for (const p of products) {
-            const variantsQuery = collection(firestore, 'products', p.id, 'variants');
-            const variantsSnapshot = await getDocs(variantsQuery);
-            variantsSnapshot.forEach(variantDoc => {
-              const variantData = variantDoc.data() as ProductVariant;
-              allItems.push({
-                ...variantData,
-                id: variantDoc.id,
-                productId: p.id,
-                productName: p.name,
-                category: p.category,
-              });
-            });
-          }
-          setInventory(allItems);
-        } catch (e: any) {
-            const permissionError = new FirestorePermissionError({
-                path: 'products', // Generic path as it iterates
-                operation: 'list',
-            });
-            errorEmitter.emit('permission-error', permissionError);
-        } finally {
-            setIsDerivingInventory(false);
-        }
-      };
-      fetchAllVariants();
-    } else if (!productsLoading && !isUserLoading) {
+    if (!user || productsLoading) {
+      setIsDerivingInventory(true);
+      return;
+    };
+    if (!products) {
+      setInventory([]);
       setIsDerivingInventory(false);
+      return;
     }
-  }, [products, firestore, productsLoading, user, isUserLoading]);
+
+    const fetchAllVariants = async () => {
+      setIsDerivingInventory(true);
+      const allItems: InventoryItem[] = [];
+      try {
+        for (const p of products) {
+          const variantsQuery = query(collection(firestore, 'products', p.id, 'variants'));
+          const variantsSnapshot = await getDocs(variantsQuery);
+          variantsSnapshot.forEach(variantDoc => {
+            const variantData = variantDoc.data() as ProductVariant;
+            allItems.push({
+              ...variantData,
+              id: variantDoc.id,
+              productId: p.id,
+              productName: p.name,
+              category: p.category,
+            });
+          });
+        }
+        setInventory(allItems);
+      } catch (e: any) {
+          const permissionError = new FirestorePermissionError({
+              path: 'products', // This is a best-effort guess on path
+              operation: 'list',
+          });
+          errorEmitter.emit('permission-error', permissionError);
+      } finally {
+          setIsDerivingInventory(false);
+      }
+    };
+    fetchAllVariants();
+
+  }, [products, firestore, productsLoading, user]);
 
 
   const handleStockChange = (productId: string, variantId: string, newStock: number) => {
@@ -102,6 +109,7 @@ export default function InventoryPage() {
     
     updateDoc(variantRef, updatedData)
       .then(() => {
+        // Optimistic update in UI
         setInventory(prev => prev.map(item => 
           item.id === variantId ? { ...item, stock: newStock } : item
         ));
@@ -117,6 +125,7 @@ export default function InventoryPage() {
             requestResourceData: updatedData
         });
         errorEmitter.emit('permission-error', permissionError);
+        // Optional: Revert optimistic update if needed, though use-toast might suffice
       });
   };
 
@@ -151,9 +160,10 @@ export default function InventoryPage() {
                   <InventoryRowSkeleton />
                   <InventoryRowSkeleton />
                   <InventoryRowSkeleton />
+                  <InventoryRowSkeleton />
                 </>
               ) : inventory.length > 0 ? (
-                inventory.map((item) => (
+                inventory.sort((a, b) => a.productName.localeCompare(b.productName)).map((item) => (
                   <TableRow key={item.id}>
                     <TableCell className="font-medium">{item.productName}</TableCell>
                     <TableCell>
@@ -171,6 +181,7 @@ export default function InventoryPage() {
                            type="number"
                            defaultValue={item.stock}
                            className="w-20 h-8"
+                           min="0"
                            onBlur={(e) => handleStockChange(item.productId, item.id, parseInt(e.target.value) || 0)}
                          />
                        </div>
