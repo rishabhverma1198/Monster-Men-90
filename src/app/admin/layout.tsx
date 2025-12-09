@@ -34,10 +34,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useAuth, useUser, useFirestore, setDocumentNonBlocking } from "@/firebase";
+import { useAuth, useUser, useFirestore } from "@/firebase";
 import { useEffect, useState } from "react";
-import { signOut, createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { signOut } from "firebase/auth";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 type AuthState = "loading" | "authenticated" | "unauthenticated" | "not-admin" | "error";
@@ -89,7 +89,7 @@ export default function AdminLayout({
         } else {
             // MANUAL ADMIN CREATION FAILSAFE
             // If the logged-in user is the one from our config but not in the 'admins' table, create it.
-            if (user.email === "admin.monsermens90@gmail.com") {
+            if (user.email === "jayantv427@gmail.com") {
                 console.log("[AdminLayout] User is default admin email, but not in 'admins' collection. Creating admin entry...");
                 setVerificationStep("Creating Admin User");
                 const adminData = { isAdmin: true, createdAt: new Date() };
@@ -250,6 +250,3 @@ export default function AdminLayout({
     </SidebarProvider>
   );
 }
-    
-
-    

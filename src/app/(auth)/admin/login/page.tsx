@@ -22,7 +22,7 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 
 export default function AdminLoginPage() {
-    const [email, setEmail] = useState("admin.monsermens90@gmail.com");
+    const [email, setEmail] = useState("jayantv427@gmail.com");
     const [password, setPassword] = useState("password123");
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -93,7 +93,7 @@ export default function AdminLoginPage() {
             await sendSignInLinkToEmail(auth, email, actionCodeSettings);
             window.localStorage.setItem('emailForSignIn', email);
             setSuccessMessage("A login link has been sent to your email address.");
-        } catch (err: any) {
+        } catch (err: any) => {
             handleAuthError(err);
         } finally {
             setIsLoading(false);
@@ -172,7 +172,7 @@ export default function AdminLoginPage() {
                         <AlertCircle className="h-4 w-4 text-blue-600" />
                         <AlertTitle className="text-blue-800 dark:text-blue-300">How to Login</AlertTitle>
                         <AlertDescription className="text-blue-700 dark:text-blue-400">
-                            Use email: <strong>admin.monsermens90@gmail.com</strong> and password: <strong>password123</strong>. If the user doesn't exist, it will be automatically created for you on the first login attempt.
+                            Use email: <strong>jayantv427@gmail.com</strong> and password: <strong>password123</strong>. If the user doesn't exist, it will be automatically created for you on the first login attempt.
                         </AlertDescription>
                     </Alert>
                     <form onSubmit={handleLogin} className="space-y-4">
@@ -199,7 +199,7 @@ export default function AdminLoginPage() {
                         )}
                         <div className="space-y-2">
                             <Label htmlFor="email-password">Email</Label>
-                            <Input id="email-password" type="email" placeholder="admin.monsermens90@gmail.com" required value={email} onChange={(e) => setEmail(e.target.value)} disabled={isLoading} />
+                            <Input id="email-password" type="email" placeholder="jayantv427@gmail.com" required value={email} onChange={(e) => setEmail(e.target.value)} disabled={isLoading} />
                         </div>
                         <div className="space-y-2 relative">
                             <Label htmlFor="password">Password</Label>
@@ -259,7 +259,7 @@ export default function AdminLoginPage() {
                         )}
                         <div className="space-y-2">
                             <Label htmlFor="email-link">Email</Label>
-                            <Input id="email-link" type="email" placeholder="admin.monsermens90@gmail.com" required value={email} onChange={(e) => setEmail(e.target.value)} disabled={isLoading || !!successMessage} />
+                            <Input id="email-link" type="email" placeholder="jayantv427@gmail.com" required value={email} onChange={(e) => setEmail(e.target.value)} disabled={isLoading || !!successMessage} />
                         </div>
                         <Button type="submit" className="w-full" disabled={isLoading || !!successMessage}>
                             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -274,5 +274,3 @@ export default function AdminLoginPage() {
     </div>
   );
 }
-
-    
