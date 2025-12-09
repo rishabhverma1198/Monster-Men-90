@@ -36,11 +36,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useAuth, useUser } from "@/firebase";
+import { useAuth, useUser, useFirestore } from "@/firebase";
 import { useEffect, useState } from "react";
 import { signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
-import { useFirestore } from "@/firebase";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 type AuthState = "loading" | "authenticated" | "unauthenticated" | "not-admin" | "error";
@@ -60,49 +59,45 @@ export default function AdminLayout({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    console.log("[AdminLayout] useEffect triggered.");
-    console.log(`[AdminLayout] Initial state: isUserLoading=${isUserLoading}, firestore available=${!!firestore}`);
+    console.log(`[AdminLayout] useEffect triggered. isUserLoading: ${isUserLoading}, user: ${!!user}, firestore: ${!!firestore}`);
 
     if (isUserLoading || !firestore) {
-      console.log("[AdminLayout] Still loading user or firestore is not available. Setting state to 'loading'.");
+      console.log("[AdminLayout] State: LOADING - Waiting for user and Firestore services.");
       setAuthState("loading");
       setVerificationStep("Verifying Login");
       return;
     }
-    
-    console.log("[AdminLayout] User loading complete. User object:", user);
 
     if (!user) {
-      console.log("[AdminLayout] No user found. Redirecting to /admin/login.");
-      router.replace("/admin/login");
+      console.log("[AdminLayout] State: UNAUTHENTICATED - No user found. Redirecting to /admin/login.");
       setAuthState("unauthenticated");
+      router.replace("/admin/login");
       return;
     }
 
+    console.log(`[AdminLayout] State: VERIFYING ADMIN - User found (UID: ${user.uid}). Checking admin status.`);
     setVerificationStep("Checking Admin Privileges");
-    console.log("[AdminLayout] User found. Proceeding to check admin status for UID:", user.uid);
-    
+
     const checkAdminStatus = async () => {
       try {
-        console.log("[AdminLayout] Creating Firestore document reference for admins collection.");
         const adminDocRef = doc(firestore, "admins", user.uid);
-        console.log("[AdminLayout] Fetching admin document from Firestore...");
+        console.log(`[AdminLayout] Fetching document from Firestore: admins/${user.uid}`);
         const adminDoc = await getDoc(adminDocRef);
 
         if (adminDoc.exists()) {
-          console.log("[AdminLayout] Admin document exists. User is an admin. Setting state to 'authenticated'.");
+          console.log("[AdminLayout] State: AUTHENTICATED - Admin document found. User is an admin.");
           setAuthState("authenticated");
           setVerificationStep("Done");
         } else {
-          console.log("[AdminLayout] Admin document does not exist. User is not an admin. Signing out and redirecting.");
+          console.log("[AdminLayout] State: NOT-ADMIN - Admin document does not exist. Signing out and redirecting.");
           setAuthState("not-admin");
           if (auth) await signOut(auth);
           router.replace("/admin/login?error=not-admin");
         }
       } catch (error: any) {
-         console.error("[AdminLayout] CRITICAL ERROR checking admin status:", error);
-         setErrorMessage(`Could not verify admin status. Error: ${error.message}. Check your internet connection and Firestore rules.`);
+         console.error("[AdminLayout] CRITICAL ERROR while checking admin status:", error);
          setAuthState("error");
+         setErrorMessage(`Firestore error while checking admin status: ${error.message}. Check console and Firestore rules.`);
          if (auth) {
            console.log("[AdminLayout] Signing out user due to error.");
            await signOut(auth);
@@ -111,7 +106,7 @@ export default function AdminLayout({
     };
 
     checkAdminStatus();
-  }, [user, isUserLoading, router, auth, firestore]);
+  }, [user, isUserLoading, firestore, auth, router]);
 
   const handleLogout = async () => {
     if (auth) {
@@ -121,7 +116,7 @@ export default function AdminLayout({
     }
   };
 
-  console.log(`[AdminLayout] Rendering with authState: ${authState}`);
+  console.log(`[AdminLayout] Rendering UI with authState: ${authState}`);
 
   if (authState !== "authenticated") {
     return (
@@ -130,13 +125,15 @@ export default function AdminLayout({
             {authState === "loading" && (
                 <div className="flex flex-col items-center justify-center gap-4 p-8 rounded-lg border">
                     <div className="flex items-center gap-3 text-lg font-semibold">
-                        {verificationStep === "Verifying Login" ? <Loader2 className="h-5 w-5 animate-spin" /> : <UserCheck className="h-5 w-5 text-green-500"/>}
-                        <span>Verifying Login</span>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span>{verificationStep}...</span>
                     </div>
-                     <div className="flex items-center gap-3 text-lg font-semibold text-muted-foreground">
-                        {verificationStep === "Checking Admin Privileges" ? <Loader2 className="h-5 w-5 animate-spin" /> : <Server className="h-5 w-5"/>}
-                        <span>Checking Admin Privileges</span>
-                    </div>
+                </div>
+            )}
+            {authState === "unauthenticated" && (
+                <div className="flex flex-col items-center justify-center gap-4 p-8 rounded-lg border">
+                     <Loader2 className="h-5 w-5 animate-spin" />
+                     <span>Redirecting to login...</span>
                 </div>
             )}
             {authState === "not-admin" && (
@@ -163,6 +160,7 @@ export default function AdminLayout({
     );
   }
   
+  // Render the actual admin layout if authenticated
   return (
     <SidebarProvider>
       <div className="flex min-h-screen">
@@ -253,3 +251,5 @@ export default function AdminLayout({
     </SidebarProvider>
   );
 }
+
+    
