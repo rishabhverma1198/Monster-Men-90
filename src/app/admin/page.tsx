@@ -41,20 +41,20 @@ export default function AdminDashboard() {
   const { user, isUserLoading } = useUser();
 
   const productsQuery = useMemoFirebase(
-    () => (firestore && !isUserLoading ? collection(firestore, 'products') : null),
-    [firestore, isUserLoading]
+    () => (firestore && user ? collection(firestore, 'products') : null),
+    [firestore, user]
   );
   const { data: products, isLoading: productsLoading } = useCollection<Product>(productsQuery);
 
   const ordersQuery = useMemoFirebase(
-    () => (firestore && !isUserLoading ? collection(firestore, 'orders_leads') : null),
-    [firestore, isUserLoading]
+    () => (firestore && user ? collection(firestore, 'orders_leads') : null),
+    [firestore, user]
   );
   const { data: orders, isLoading: ordersLoading } = useCollection<Order>(ordersQuery);
 
   const recentOrdersQuery = useMemoFirebase(
-    () => (firestore && !isUserLoading ? query(collection(firestore, 'orders_leads'), orderBy('createdAt', 'desc'), limit(5)) : null),
-    [firestore, isUserLoading]
+    () => (firestore && user ? query(collection(firestore, 'orders_leads'), orderBy('createdAt', 'desc'), limit(5)) : null),
+    [firestore, user]
   );
   const { data: recentOrders, isLoading: recentOrdersLoading } = useCollection<Order>(recentOrdersQuery);
 
@@ -65,7 +65,7 @@ export default function AdminDashboard() {
       }, 0)
     : 0;
     
-  const isLoading = productsLoading || ordersLoading || recentOrdersLoading;
+  const isLoading = productsLoading || ordersLoading || recentOrdersLoading || isUserLoading;
 
   return (
     <div className="flex w-full flex-col gap-4 md:gap-8">

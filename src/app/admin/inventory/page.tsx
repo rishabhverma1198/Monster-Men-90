@@ -57,7 +57,7 @@ export default function InventoryPage() {
   const { data: products, isLoading: productsLoading } = useCollection<Product>(productsQuery);
 
   useEffect(() => {
-    if (products && firestore) {
+    if (products && firestore && user) {
       const fetchAllVariants = async () => {
         setIsDerivingInventory(true);
         const allItems: InventoryItem[] = [];
@@ -88,10 +88,10 @@ export default function InventoryPage() {
         }
       };
       fetchAllVariants();
-    } else if (!productsLoading) {
+    } else if (!productsLoading && !isUserLoading) {
       setIsDerivingInventory(false);
     }
-  }, [products, firestore, productsLoading]);
+  }, [products, firestore, productsLoading, user, isUserLoading]);
 
 
   const handleStockChange = (productId: string, variantId: string, newStock: number) => {

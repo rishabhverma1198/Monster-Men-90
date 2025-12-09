@@ -69,13 +69,15 @@ function LeadRowSkeleton() {
 
 export default function LeadsPage() {
   const firestore = useFirestore();
-  const { isUserLoading } = useUser();
+  const { user, isUserLoading } = useUser();
   const ordersQuery = useMemoFirebase(
-    () => (firestore && !isUserLoading ? collection(firestore, 'orders_leads') : null),
-    [firestore, isUserLoading]
+    () => (firestore && user ? collection(firestore, 'orders_leads') : null),
+    [firestore, user]
   );
   const { data: orders, isLoading } = useCollection<Order>(ordersQuery);
   const leads = getLeadsFromOrders(orders);
+  
+  const dataLoading = isLoading || isUserLoading;
 
   return (
     <div className="flex flex-col gap-4">
@@ -102,7 +104,7 @@ export default function LeadsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading || isUserLoading ? (
+              {dataLoading ? (
                 <>
                     <LeadRowSkeleton />
                     <LeadRowSkeleton />
