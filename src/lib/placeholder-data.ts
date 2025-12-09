@@ -20,8 +20,8 @@ export const placeholderProducts: Product[] = [
     price: 89.99,
     tags: ['denim', 'jacket', 'men', 'classic', 'outerwear'],
     status: 'inactive',
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   },
   {
     id: '2',
@@ -34,8 +34,8 @@ export const placeholderProducts: Product[] = [
     price: 65.0,
     tags: ['sweater', 'men', 'striped', 'knitwear'],
     status: 'inactive',
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   },
   {
     id: '3',
@@ -48,8 +48,8 @@ export const placeholderProducts: Product[] = [
     price: 120.5,
     tags: ['dress', 'women', 'floral', 'maxi', 'elegant'],
     status: 'active',
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   },
   {
     id: '4',
@@ -62,7 +62,7 @@ export const placeholderProducts: Product[] = [
     price: 75.0,
     tags: ['jeans', 'women', 'skinny', 'denim', 'high-waist'],
     status: 'active',
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   },
 ];

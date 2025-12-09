@@ -285,9 +285,8 @@ export default function AdminProductsPage() {
 }
 
 // Memoized row component to avoid re-rendering every row on filter change
-const ProductRow = memo(function ProductRow({ product, onSelectDelete }: { product: Product, onSelectDelete: (product: Product) => void}) {
+const ProductRow = memo(function ProductRow({ product, onSelectDelete }: { product: Product & { createdAt: Timestamp }, onSelectDelete: (product: Product) => void}) {
     const firestore = useFirestore();
-    const user = useUser();
     const { toast } = useToast();
 
     const handleStatusChange = async (productId: string, newStatus: boolean) => {
@@ -334,7 +333,7 @@ const ProductRow = memo(function ProductRow({ product, onSelectDelete }: { produ
                 ${product.price.toFixed(2)}
             </TableCell>
             <TableCell className="hidden md:table-cell">
-                {product.createdAt ? new Date(product.createdAt.seconds * 1000).toLocaleDateString() : 'N/A'}
+                {product.createdAt ? product.createdAt.toDate().toLocaleDateString() : 'N/A'}
             </TableCell>
             <TableCell className="hidden md:table-cell">
                 <Switch
