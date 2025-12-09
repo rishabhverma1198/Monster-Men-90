@@ -16,22 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Phone, Ban, CheckCircle } from "lucide-react";
-import type { Order } from "@/lib/types";
-import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, query, orderBy, Timestamp } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useMemo } from "react";
-
-interface Lead {
-    name: string;
-    phone: string;
-    orderIds: string[];
-    totalSpent: number;
-}
-
 
 function LeadRowSkeleton() {
     return (
@@ -46,39 +31,6 @@ function LeadRowSkeleton() {
 }
 
 export default function LeadsPage() {
-  const firestore = useFirestore();
-  const { user, isUserLoading } = useUser();
-  const ordersQuery = useMemoFirebase(
-    () => (firestore && user ? query(collection(firestore, 'orders_leads'), orderBy('createdAt', 'desc')) : null),
-    [firestore, user]
-  );
-  // This hook will now likely return an error due to tightened security rules, which is expected.
-  const { data: orders, isLoading, error } = useCollection<Order & { createdAt: Timestamp }>(ordersQuery);
-
-  const leads = useMemo(() => {
-    if (!orders) return [];
-    const leadsMap = new Map<string, Lead>();
-
-    orders.forEach(order => {
-      const total = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-      const existingLead = leadsMap.get(order.phone);
-      if (existingLead) {
-        existingLead.orderIds.push(order.orderId);
-        existingLead.totalSpent += total;
-      } else {
-        leadsMap.set(order.phone, {
-          name: order.name,
-          phone: order.phone,
-          orderIds: [order.orderId],
-          totalSpent: total,
-        });
-      }
-    });
-
-    return Array.from(leadsMap.values()).sort((a, b) => b.totalSpent - a.totalSpent);
-  }, [orders]);
-  
-  const dataLoading = isLoading || isUserLoading;
 
   return (
     <div className="flex flex-col gap-4">
@@ -90,7 +42,7 @@ export default function LeadsPage() {
         <CardHeader>
           <CardTitle>Customer Leads</CardTitle>
           <CardDescription>
-            This page is disabled because it requires listing all orders, which is not permitted by the current security rules.
+            This page is currently disabled. Listing all customers at once is not permitted by security rules to ensure application performance and security.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -105,24 +57,11 @@ export default function LeadsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {dataLoading ? (
-                <>
-                    <LeadRowSkeleton />
-                    <LeadRowSkeleton />
-                </>
-              ) : error ? (
                  <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center text-destructive">
-                    Could not load leads. You don't have permission to list all orders.
+                  <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                    Lead functionality is disabled.
                   </TableCell>
                 </TableRow>
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
-                    Lead functionality is currently disabled.
-                  </TableCell>
-                </TableRow>
-              )}
             </TableBody>
           </Table>
         </CardContent>

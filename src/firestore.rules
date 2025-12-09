@@ -1,0 +1,42 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to identify the admin user by their email.
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == 'jayantv427@gmail.com';
+    }
+
+    // Admin records are only readable/writable by the admin themselves.
+    match /admins/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Products and their variants are publicly readable.
+    // Only the admin can create, update, or delete them.
+    match /products/{productId} {
+      allow get, list: if true;
+      allow write: if isAdmin();
+
+      match /variants/{variantId} {
+        allow get, list: if true;
+        allow write: if isAdmin();
+      }
+    }
+    
+    // IMPORTANT: Listing all orders is disallowed for security and performance.
+    // We only allow the admin to list a small number of recent orders for the dashboard.
+    match /orders_leads {
+        allow list: if isAdmin() && query.limit <= 5;
+    }
+
+    // Individual orders can be created by anyone (checkout process).
+    // Only the admin can read, update, or delete a specific order document.
+    match /orders_leads/{orderId} {
+      allow create: if true;
+      allow get, update, delete: if isAdmin();
+    }
+  }
+}
