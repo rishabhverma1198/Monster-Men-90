@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, memo } from "react";
 import Image from 'next/image';
 import { ProductForm } from "@/components/admin/ProductForm";
 import {
