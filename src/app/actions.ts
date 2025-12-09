@@ -15,9 +15,11 @@ async function getFirebaseInstances() {
     let app;
     if (!getApps().length) {
       try {
+        // This will automatically use the correct configuration on Firebase App Hosting
         app = initializeApp();
       } catch (e) {
         console.warn('Automatic initialization failed. Falling back to firebase config object.', e);
+        // This is the fallback for local development
         app = initializeApp(firebaseConfig);
       }
     } else {
