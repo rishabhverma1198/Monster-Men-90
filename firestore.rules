@@ -1,16 +1,17 @@
+
 /**
  * This ruleset provides security for the MonserMens90 e-commerce application.
  *
  * Core Philosophy:
  * The security model is designed for a public-facing product catalog with a secure, admin-only management backend.
  * It uses a Role-Based Access Control (RBAC) system where admin privileges are granted by the existence of a document
- * in the `/roles_admin` collection. This allows for secure management of products and orders.
+ * in the `/admins` collection. This allows for secure management of products and orders.
  *
  * Data Structure:
  * - /products/{productId}: Publicly readable product data.
  *   - /variants/{variantId}: Publicly readable product variants (e.g., sizes).
  * - /orders_leads/{orderId}: Private order data, created by any user (including guests).
- * - /roles_admin/{uid}: A list of admin users, where the document ID is the user's Auth UID.
+ * - /admins/{uid}: A list of admin users, where the document ID is the user's Auth UID.
  *
  * Key Security Decisions:
  * - Product Catalog: The entire `/products` collection and its subcollections are publicly readable to allow any visitor
@@ -23,7 +24,7 @@
  *
  * Denormalization for Authorization:
  * Instead of embedding an `isAdmin` flag in a user profile document (which would require a costly `get()` call in rules),
- * this ruleset uses a dedicated `/roles_admin/{uid}` collection. This allows for a highly performant authorization check
+ * this ruleset uses a dedicated `/admins/{uid}` collection. This allows for a highly performant authorization check
  * using `exists()`, which does not incur a read charge and is optimized for this exact use case.
  */
 rules_version = '2';
@@ -44,10 +45,10 @@ service cloud.firestore {
     /**
      * Checks if the currently authenticated user has admin privileges.
      * Admin status is granted by the existence of a document for the user's UID
-     * in the /roles_admin collection. This is a fast and non-billable check.
+     * in the /admins collection. This is a fast and non-billable check.
      */
     function isAdmin() {
-      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
     // --------------------------------
@@ -65,8 +66,8 @@ service cloud.firestore {
       allow get: if true;
       allow list: if true;
       allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
 
       /**
        * @description Manages product variants (e.g., sizes). Follows the same security model as the parent product.
@@ -79,8 +80,8 @@ service cloud.firestore {
         allow get: if true;
         allow list: if true;
         allow create: if isAdmin() && request.resource.data.productId == productId;
-        allow update: if isAdmin() && resource != null && request.resource.data.productId == resource.data.productId;
-        allow delete: if isAdmin() && resource != null;
+        allow update: if isAdmin() && request.resource.data.productId == productId;
+        allow delete: if isAdmin();
       }
     }
 
@@ -95,23 +96,21 @@ service cloud.firestore {
       allow get: if isAdmin();
       allow list: if isAdmin();
       allow create: if true;
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
      * @description Defines which users are administrators. The existence of a document grants the role.
-     * @path /roles_admin/{uid}
+     * @path /admins/{uid}
      * @allow (create) An existing admin can add a new document to make another user an admin.
      * @deny (create) A non-admin user cannot create a document here to grant themselves admin privileges.
      * @principle Admin-Managed Roles. Ensures that only existing administrators can manage the list of who has administrative access.
      */
-    match /roles_admin/{uid} {
-      allow get: if isAdmin();
-      allow list: if isAdmin();
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
+    match /admins/{uid} {
+      allow read, write: if isAdmin();
     }
   }
 }
+
+    

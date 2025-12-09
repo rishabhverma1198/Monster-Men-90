@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "Product": {
@@ -44,6 +45,11 @@
           "type": "string",
           "description": "A URL-friendly slug for the product."
         },
+        "status": {
+            "type": "string",
+            "description": "The status of the product.",
+            "enum": ["active", "inactive"]
+        },
         "createdAt": {
           "type": "string",
           "description": "Timestamp indicating when the product was created.",
@@ -64,6 +70,7 @@
         "price",
         "tags",
         "slug",
+        "status",
         "createdAt",
         "updatedAt"
       ]
@@ -146,12 +153,34 @@
         "status",
         "createdAt"
       ]
+    },
+    "Admin": {
+      "title": "Admin",
+      "type": "object",
+      "description": "A document that grants admin privileges to a user.",
+      "properties": {
+        "role": {
+          "type": "string",
+          "const": "admin"
+        }
+      },
+      "required": ["role"]
     }
   },
   "auth": {
     "providers": [
       "password",
-      "anonymous"
+      "anonymous",
+      "emailLink"
+    ],
+    "users": [
+      {
+        "email": "admin.monsermens90@gmail.com",
+        "password": "password123",
+        "customClaims": {
+          "admin": true
+        }
+      }
     ]
   },
   "firestore": {
@@ -209,11 +238,11 @@
         }
       },
       {
-        "path": "/roles_admin/{uid}",
+        "path": "/admins/{uid}",
         "definition": {
-          "entityName": "admin",
+          "entityName": "Admin",
           "schema": {
-            "$ref": "#/backend/entities/admin"
+            "$ref": "#/backend/entities/Admin"
           },
           "description": "Documents in this collection grant admin privileges. Existence of a document for a given UID grants admin role.",
           "params": [
@@ -225,6 +254,7 @@
         }
       }
     ],
-    "reasoning": "The Firestore structure is designed to support the MonserMens90 e-commerce application, focusing on product catalog management, order processing, and a simple admin interface. Authorization Independence is maintained by not requiring `get()` calls in security rules. Instead, roles can be managed via a dedicated `roles_admin/{uid}` collection. The structure is optimized for the app's unique requirements, like placing orders without user authentication and providing order tracking via Order ID and Phone number. This is achieved by storing order details in a dedicated `orders_leads` collection.\n\n**Authorization Independence:** Authorization relies solely on the existence of a document in the `/roles_admin/{uid}` collection. There is no dependency on data outside of the authenticated user's ID.\n\n**QAPs (Queries are not Filters):** List operations for products are inherently secure as all products share the same access needs (publicly visible). Order lists are only accessible to admins (controlled via the `/roles_admin/{uid}` collection).\n"
+    "reasoning": "The Firestore structure is designed to support the MonserMens90 e-commerce application, focusing on product catalog management, order processing, and a simple admin interface. Authorization Independence is maintained by not requiring `get()` calls in security rules. Instead, roles can be managed via a dedicated `admins/{uid}` collection. The structure is optimized for the app's unique requirements, like placing orders without user authentication and providing order tracking via Order ID and Phone number. This is achieved by storing order details in a dedicated `orders_leads` collection.\n\n**Authorization Independence:** Authorization relies solely on the existence of a document in the `/admins/{uid}` collection. There is no dependency on data outside of the authenticated user's ID.\n\n**QAPs (Queries are not Filters):** List operations for products are inherently secure as all products share the same access needs (publicly visible). Order lists are only accessible to admins (controlled via the `/admins/{uid}` collection).\n"
   }
 }
+    

@@ -22,7 +22,7 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 
 export default function AdminLoginPage() {
-    const [email, setEmail] = useState("admin@example.com");
+    const [email, setEmail] = useState("admin.monsermens90@gmail.com");
     const [password, setPassword] = useState("password123");
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -111,6 +111,7 @@ export default function AdminLoginPage() {
     }
 
     const handleAuthError = (err: any) => {
+        console.error("Login Error: ", err); // Added for debugging
         switch(err.code) {
             case "auth/user-not-found":
             case "auth/wrong-password":
@@ -121,7 +122,7 @@ export default function AdminLoginPage() {
                 setError("Please enter a valid email address.");
                 break;
             default:
-                setError("An unexpected error occurred. Please try again.");
+                setError(`An unexpected error occurred: ${err.message}. Please try again.`);
                 break;
         }
     }
@@ -154,7 +155,7 @@ export default function AdminLoginPage() {
                         <AlertCircle className="h-4 w-4 text-blue-600" />
                         <AlertTitle className="text-blue-800 dark:text-blue-300">How to Login & Become an Admin</AlertTitle>
                         <AlertDescription className="text-blue-700 dark:text-blue-400">
-                            Use email: <strong>admin@example.com</strong> and password: <strong>password123</strong> to log in. To add other admins, go to your Firebase Console, create a user in Authentication, then in Firestore create a collection named `admins`, and add a document where the Document ID is the user's UID.
+                            Use email: <strong>admin.monsermens90@gmail.com</strong> and password: <strong>password123</strong> to log in. To add other admins, go to your Firebase Console, create a user in Authentication, then in Firestore create a collection named `admins`, and add a document where the Document ID is the user's UID.
                         </AlertDescription>
                     </Alert>
                     <form onSubmit={handleLogin} className="space-y-4">
@@ -181,7 +182,7 @@ export default function AdminLoginPage() {
                         )}
                         <div className="space-y-2">
                             <Label htmlFor="email-password">Email</Label>
-                            <Input id="email-password" type="email" placeholder="admin@example.com" required value={email} onChange={(e) => setEmail(e.target.value)} disabled={isLoading} />
+                            <Input id="email-password" type="email" placeholder="admin.monsermens90@gmail.com" required value={email} onChange={(e) => setEmail(e.target.value)} disabled={isLoading} />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="password">Password</Label>
@@ -224,7 +225,7 @@ export default function AdminLoginPage() {
                         )}
                         <div className="space-y-2">
                             <Label htmlFor="email-link">Email</Label>
-                            <Input id="email-link" type="email" placeholder="admin@example.com" required value={email} onChange={(e) => setEmail(e.target.value)} disabled={isLoading || !!successMessage} />
+                            <Input id="email-link" type="email" placeholder="admin.monsermens90@gmail.com" required value={email} onChange={(e) => setEmail(e.target.value)} disabled={isLoading || !!successMessage} />
                         </div>
                         <Button type="submit" className="w-full" disabled={isLoading || !!successMessage}>
                             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -239,3 +240,5 @@ export default function AdminLoginPage() {
     </div>
   );
 }
+
+    

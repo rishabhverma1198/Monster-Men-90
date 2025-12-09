@@ -21,8 +21,6 @@ import {
   LogOut,
   Loader2,
   ShieldAlert,
-  Server,
-  UserCheck,
 } from "lucide-react";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -61,8 +59,8 @@ export default function AdminLayout({
   useEffect(() => {
     console.log(`[AdminLayout] useEffect triggered. isUserLoading: ${isUserLoading}, user: ${!!user}, firestore: ${!!firestore}`);
 
-    if (isUserLoading || !firestore) {
-      console.log("[AdminLayout] State: LOADING - Waiting for user and Firestore services.");
+    if (isUserLoading || !firestore || !auth) {
+      console.log("[AdminLayout] State: LOADING - Waiting for user and Firebase services.");
       setAuthState("loading");
       setVerificationStep("Verifying Login");
       return;
@@ -90,18 +88,16 @@ export default function AdminLayout({
           setVerificationStep("Done");
         } else {
           console.log("[AdminLayout] State: NOT-ADMIN - Admin document does not exist. Signing out and redirecting.");
-          setAuthState("not-admin");
-          if (auth) await signOut(auth);
+          await signOut(auth);
+          setAuthState("not-admin"); // Set state after signout
           router.replace("/admin/login?error=not-admin");
         }
       } catch (error: any) {
          console.error("[AdminLayout] CRITICAL ERROR while checking admin status:", error);
+         // Sign out the user to prevent potential loops if they are stuck
+         await signOut(auth);
          setAuthState("error");
-         setErrorMessage(`Firestore error while checking admin status: ${error.message}. Check console and Firestore rules.`);
-         if (auth) {
-           console.log("[AdminLayout] Signing out user due to error.");
-           await signOut(auth);
-         }
+         setErrorMessage(`Firestore error: ${error.message}. You have been logged out. Check console and Firestore rules.`);
       }
     };
 
@@ -122,18 +118,12 @@ export default function AdminLayout({
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <div className="w-full max-w-md p-4 space-y-4">
-            {authState === "loading" && (
+            {(authState === "loading" || authState === 'unauthenticated') && (
                 <div className="flex flex-col items-center justify-center gap-4 p-8 rounded-lg border">
                     <div className="flex items-center gap-3 text-lg font-semibold">
                         <Loader2 className="h-5 w-5 animate-spin" />
-                        <span>{verificationStep}...</span>
+                        <span>{authState === 'unauthenticated' ? 'Redirecting to login...' : `${verificationStep}...`}</span>
                     </div>
-                </div>
-            )}
-            {authState === "unauthenticated" && (
-                <div className="flex flex-col items-center justify-center gap-4 p-8 rounded-lg border">
-                     <Loader2 className="h-5 w-5 animate-spin" />
-                     <span>Redirecting to login...</span>
                 </div>
             )}
             {authState === "not-admin" && (
