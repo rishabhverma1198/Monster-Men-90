@@ -22,8 +22,8 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 
 export default function AdminLoginPage() {
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
+    const [email, setEmail] = useState("admin@example.com");
+    const [password, setPassword] = useState("password123");
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -152,9 +152,9 @@ export default function AdminLoginPage() {
                 <CardContent>
                     <Alert variant="default" className="mb-4 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
                         <AlertCircle className="h-4 w-4 text-blue-600" />
-                        <AlertTitle className="text-blue-800 dark:text-blue-300">How to become an Admin</AlertTitle>
+                        <AlertTitle className="text-blue-800 dark:text-blue-300">How to Login & Become an Admin</AlertTitle>
                         <AlertDescription className="text-blue-700 dark:text-blue-400">
-                            After signing up, go to your Firebase Console. In Firestore, create a collection named `admins`, and add a document where the Document ID is your User UID from Firebase Authentication.
+                            Use email: <strong>admin@example.com</strong> and password: <strong>password123</strong> to log in. To add other admins, go to your Firebase Console, create a user in Authentication, then in Firestore create a collection named `admins`, and add a document where the Document ID is the user's UID.
                         </AlertDescription>
                     </Alert>
                     <form onSubmit={handleLogin} className="space-y-4">
