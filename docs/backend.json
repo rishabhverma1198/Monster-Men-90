@@ -1,0 +1,230 @@
+{
+  "entities": {
+    "Product": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Product",
+      "type": "object",
+      "description": "Represents a product available for sale in the MonserMens90 store.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the product."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the product."
+        },
+        "category": {
+          "type": "string",
+          "description": "The category the product belongs to (Men, Women, etc.)."
+        },
+        "images": {
+          "type": "array",
+          "description": "An array of URLs pointing to the product images.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "description": {
+          "type": "string",
+          "description": "A detailed description of the product."
+        },
+        "price": {
+          "type": "number",
+          "description": "The price of the product."
+        },
+        "tags": {
+          "type": "array",
+          "description": "An array of tags associated with the product for search.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "slug": {
+          "type": "string",
+          "description": "A URL-friendly slug for the product."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the product was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the product was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "category",
+        "images",
+        "description",
+        "price",
+        "tags",
+        "slug",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Variant": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Variant",
+      "type": "object",
+      "description": "Represents a specific variant of a product (e.g., size).",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the variant."
+        },
+        "productId": {
+          "type": "string",
+          "description": "Reference to Product. (Relationship: Product 1:N Variant)"
+        },
+        "size": {
+          "type": "string",
+          "description": "The size of the variant (S, M, L, XL, XXL)."
+        },
+        "stock": {
+          "type": "number",
+          "description": "The current stock level for this variant."
+        },
+        "price": {
+          "type": "number",
+          "description": "The price for this variant."
+        }
+      },
+      "required": [
+        "id",
+        "productId",
+        "size",
+        "stock",
+        "price"
+      ]
+    },
+    "OrderLead": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "OrderLead",
+      "type": "object",
+      "description": "Represents an order placed by a user.",
+      "properties": {
+        "orderId": {
+          "type": "string",
+          "description": "Unique identifier for the order."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the user who placed the order."
+        },
+        "phone": {
+          "type": "string",
+          "description": "The phone number of the user who placed the order."
+        },
+        "items": {
+          "type": "array",
+          "description": "An array of items in the order. Each item should include the productId, quantity and size.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the order (Pending, Confirmed, Packed, Shipped, Delivered)."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the order was placed.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "orderId",
+        "name",
+        "phone",
+        "items",
+        "status",
+        "createdAt"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/products/{productId}",
+        "definition": {
+          "entityName": "Product",
+          "schema": {
+            "$ref": "#/backend/entities/Product"
+          },
+          "description": "Stores product information. Includes standard product details like name, category, images, description, price, tags, and slug.",
+          "params": [
+            {
+              "name": "productId",
+              "description": "The unique identifier for the product."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/products/{productId}/variants/{variantId}",
+        "definition": {
+          "entityName": "Variant",
+          "schema": {
+            "$ref": "#/backend/entities/Variant"
+          },
+          "description": "Stores product variant information (e.g., size, stock, price).",
+          "params": [
+            {
+              "name": "productId",
+              "description": "The unique identifier for the product."
+            },
+            {
+              "name": "variantId",
+              "description": "The unique identifier for the variant."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/orders_leads/{orderId}",
+        "definition": {
+          "entityName": "OrderLead",
+          "schema": {
+            "$ref": "#/backend/entities/OrderLead"
+          },
+          "description": "Stores order information, including customer details, order items, and order status.",
+          "params": [
+            {
+              "name": "orderId",
+              "description": "The unique identifier for the order."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_admin/{uid}",
+        "definition": {
+          "entityName": "admin",
+          "schema": {
+            "$ref": "#/backend/entities/admin"
+          },
+          "description": "Documents in this collection grant admin privileges. Existence of a document for a given UID grants admin role.",
+          "params": [
+            {
+              "name": "uid",
+              "description": "The Firebase Auth UID of the admin user."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to support the MonserMens90 e-commerce application, focusing on product catalog management, order processing, and a simple admin interface. Authorization Independence is maintained by not requiring `get()` calls in security rules. Instead, roles can be managed via a dedicated `roles_admin/{uid}` collection. The structure is optimized for the app's unique requirements, like placing orders without user authentication and providing order tracking via Order ID and Phone number. This is achieved by storing order details in a dedicated `orders_leads` collection.\n\n**Authorization Independence:** Authorization relies solely on the existence of a document in the `/roles_admin/{uid}` collection. There is no dependency on data outside of the authenticated user's ID.\n\n**QAPs (Queries are not Filters):** List operations for products are inherently secure as all products share the same access needs (publicly visible). Order lists are only accessible to admins (controlled via the `/roles_admin/{uid}` collection).\n"
+  }
+}
