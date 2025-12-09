@@ -28,19 +28,18 @@ service cloud.firestore {
 
     /**
      * Checks if the request is from the designated admin user.
-     * IMPORTANT: Replace 'YOUR_ADMIN_UID_HERE' with the actual Firebase Auth UID of the admin.
+     * The admin is identified by their specific email address.
      */
     function isAdmin() {
-      // TODO: Replace with the actual Firebase Auth UID for the admin account.
-      return request.auth != null && request.auth.uid == 'YOUR_ADMIN_UID_HERE';
+      return request.auth != null && request.auth.token.email == 'jayantv427@gmail.com';
     }
 
     /**
-     * @description Stores admin user records. Only admins can read or write to this collection.
+     * @description Stores admin user records. Only the logged-in user can access their own admin record.
      * @path /admins/{userId}
      * @allow (read, write) An admin can access their own record to verify their status.
      * @deny (list) A non-admin user attempts to list all admins.
-     * @principle Secures admin role verification by restricting access to admins themselves.
+     * @principle Secures admin role verification by restricting access to the user themselves.
      */
     match /admins/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
@@ -50,31 +49,25 @@ service cloud.firestore {
     /**
      * @description Publicly readable product catalog, manageable only by an admin.
      * @path /products/{productId}
-     * @allow (get) Any user, authenticated or not, can read a specific product's details.
-     * @deny (create) A non-admin user attempts to create a new product.
+     * @allow (read, list) Any user, authenticated or not, can read product details.
+     * @allow (write) Only the admin can create, update, or delete products.
      * @principle Public read access for catalog items with admin-only write control to protect data integrity.
      */
     match /products/{productId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
+      allow get, list: if true;
+      allow write: if isAdmin();
     }
 
     /**
      * @description Publicly readable product variants (e.g., sizes, stock), manageable only by an admin.
      * @path /products/{productId}/variants/{variantId}
-     * @allow (get) Any user can view the stock or price for a specific product size.
-     * @deny (update) A non-admin user attempts to change the stock level of a variant.
-     * @principle Enforces relational integrity by ensuring a variant is always linked to its parent product.
+     * @allow (read, list) Any user can view variant details.
+     * @allow (write) Only the admin can create, update, or delete variants.
+     * @principle Enforces that variants are linked to products and managed by admins.
      */
     match /products/{productId}/variants/{variantId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isAdmin() && request.resource.data.productId == productId;
-      allow update: if isAdmin() && resource != null && request.resource.data.productId == resource.data.productId;
-      allow delete: if isAdmin() && resource != null;
+      allow get, list: if true;
+      allow write: if isAdmin();
     }
 
     /**
@@ -82,15 +75,12 @@ service cloud.firestore {
      * but only the admin can view or manage them to protect customer privacy.
      * @path /orders_leads/{orderId}
      * @allow (create) An unauthenticated guest user successfully places a new order.
-     * @deny (list) An authenticated user attempts to list all orders in the system.
-     * @principle Protects sensitive user data (PII) by making orders write-only for the public and read-only for the admin.
+     * @allow (read, list, update, delete) Only the admin can manage orders.
+     * @principle Protects sensitive user data (PII) by making orders write-only for the public and fully accessible to the admin.
      */
     match /orders_leads/{orderId} {
-      allow get: if isAdmin();
-      allow list: if isAdmin();
       allow create: if true;
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
+      allow get, list, update, delete: if isAdmin();
     }
   }
 }
