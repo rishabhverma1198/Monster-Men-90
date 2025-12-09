@@ -164,8 +164,7 @@
           "type": "array",
           "description": "List of items ordered by the customer.",
           "items": {
-            "type": "string"
-          }
+            "type": "string"          }
         },
         "contacted": {
           "type": "boolean",
@@ -189,7 +188,8 @@
   "auth": {
     "providers": [
       "password",
-      "anonymous"
+      "anonymous",
+      "emailLink"
     ]
   },
   "firestore": {
@@ -250,3 +250,5 @@
     "reasoning": "The Firestore structure is designed to support an e-commerce application, \"MonserMens90\", focusing on simplicity and ease of management, especially for a single admin. Given the absence of user authentication for buyers and the admin-centric product management, the structure is optimized for these requirements.\n\nThe `products` collection stores product information.  `productId` serves as the document ID. A subcollection `variants` under each product stores size-specific stock and price details. This allows efficient querying for available sizes and their respective prices. This design directly supports product browsing, filtering, and display of product details.\n\nThe `orders_leads` collection stores order information, with `orderId` being the document ID. This collection captures essential order details such as customer name, phone number, ordered items, order status, and creation timestamp. Each document represents both an order and a lead.  Authorization independence is not a significant concern here because the admin is the sole actor managing these documents. Segregation is not needed because all documents in `orders_leads` have the same security requirements (admin-only access). Because we are not using `get()` in the rules, we are avoiding hierarchical authorization dependencies. This collection supports order tracking and admin functionalities for order management and lead handling.\n\nThis data structure directly supports all the core app features, including product browsing, displaying product details, managing the cart system, the checkout process, generating WhatsApp order notifications, saving order data, order tracking, and the admin panel for managing orders and products. The structure is simple, and efficient for the expected use case."
   }
 }
+
+    
