@@ -26,18 +26,17 @@ service cloud.firestore {
       }
     }
 
-    // Rule for individual order documents
-    match /orders_leads/{orderId} {
-      // Anyone can create an order (guest checkout)
-      allow create: if true;
-      // Only the admin can read, update, or delete a specific order
-      allow get, update, delete: if isAdmin();
+    // Rule for the entire orders_leads collection
+    // This allows the admin to LIST all documents in this collection.
+    match /orders_leads {
+      allow list: if isAdmin();
     }
 
-    // Rule for the entire orders_leads collection
-    match /orders_leads {
-      // Only the admin can list all documents in this collection
-      allow list: if isAdmin();
+    // Rule for individual order documents
+    // This allows creating an order and lets the admin manage a specific order.
+    match /orders_leads/{orderId} {
+      allow create: if true;
+      allow get, update, delete: if isAdmin();
     }
   }
 }
