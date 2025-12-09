@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Package2, Loader2, Terminal, MailCheck, AlertCircle } from "lucide-react";
+import { Package2, Loader2, Terminal, MailCheck, AlertCircle, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/firebase";
 import { signInWithEmailAndPassword, sendPasswordResetEmail, sendSignInLinkToEmail } from "firebase/auth";
@@ -23,6 +24,7 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 export default function AdminLoginPage() {
     const [email, setEmail] = useState("admin.monsermens90@gmail.com");
     const [password, setPassword] = useState("password123");
+    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -183,9 +185,26 @@ export default function AdminLoginPage() {
                             <Label htmlFor="email-password">Email</Label>
                             <Input id="email-password" type="email" placeholder="admin.monsermens90@gmail.com" required value={email} onChange={(e) => setEmail(e.target.value)} disabled={isLoading} />
                         </div>
-                        <div className="space-y-2">
+                        <div className="space-y-2 relative">
                             <Label htmlFor="password">Password</Label>
-                            <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} disabled={isLoading} />
+                            <Input 
+                                id="password" 
+                                type={showPassword ? "text" : "password"} 
+                                required value={password} 
+                                onChange={(e) => setPassword(e.target.value)} 
+                                disabled={isLoading} 
+                                className="pr-10"
+                            />
+                            <Button 
+                                type="button" 
+                                variant="ghost" 
+                                size="icon" 
+                                className="absolute right-1 top-7 h-7 w-7" 
+                                onClick={() => setShowPassword(prev => !prev)}
+                            >
+                                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                <span className="sr-only">{showPassword ? 'Hide password' : 'Show password'}</span>
+                            </Button>
                         </div>
                         <div className="flex items-center justify-between">
                             <Button variant="link" type="button" onClick={handleForgotPassword} className="p-0 text-sm h-auto" disabled={isLoading}>
