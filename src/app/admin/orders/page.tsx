@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Order } from "@/lib/types";
-import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
+import { useCollection, useFirestore, useMemoFirebase, useUser, errorEmitter, FirestorePermissionError } from "@/firebase";
 import { collection, doc, updateDoc, Timestamp } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -56,8 +56,8 @@ export default function OrdersPage() {
   const { toast } = useToast();
 
   const ordersQuery = useMemoFirebase(
-    () => (firestore && user && !isUserLoading ? collection(firestore, 'orders_leads') : null),
-    [firestore, user, isUserLoading]
+    () => (firestore && user ? collection(firestore, 'orders_leads') : null),
+    [firestore, user]
   );
   
   const { data: orders, isLoading } = useCollection<Order & { createdAt: Timestamp }>(ordersQuery);
@@ -66,23 +66,26 @@ export default function OrdersPage() {
     return order.items.reduce((total, item) => total + item.price * item.quantity, 0);
   }
 
-  const handleStatusChange = async (orderId: string, newStatus: Order['status']) => {
-    if (!firestore) return;
+  const handleStatusChange = (orderId: string, newStatus: Order['status']) => {
+    if (!firestore || !user) return;
     const orderRef = doc(firestore, 'orders_leads', orderId);
-    try {
-        await updateDoc(orderRef, { status: newStatus });
-        toast({
-            title: "Status Updated",
-            description: `Order ${orderId} is now ${newStatus}.`,
+    const updatedData = { status: newStatus };
+    
+    updateDoc(orderRef, updatedData)
+        .then(() => {
+            toast({
+                title: "Status Updated",
+                description: `Order ${orderId} is now ${newStatus}.`,
+            });
+        })
+        .catch(async (serverError) => {
+            const permissionError = new FirestorePermissionError({
+                path: orderRef.path,
+                operation: 'update',
+                requestResourceData: updatedData
+            });
+            errorEmitter.emit('permission-error', permissionError);
         });
-    } catch(e) {
-        console.error("Failed to update status: ", e);
-        toast({
-            title: "Update Failed",
-            description: "Could not update the order status.",
-            variant: "destructive"
-        });
-    }
   }
 
   const dataLoading = isLoading || isUserLoading;
@@ -158,3 +161,4 @@ export default function OrdersPage() {
     </div>
   );
 }
+

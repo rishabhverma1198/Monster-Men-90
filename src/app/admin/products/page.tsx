@@ -36,7 +36,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
+import { useCollection, useFirestore, useMemoFirebase, useUser, errorEmitter, FirestorePermissionError } from "@/firebase";
 import { collection, deleteDoc, doc, getDocs, writeBatch, Timestamp } from "firebase/firestore";
 import type { Product, ProductVariant } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -88,60 +88,65 @@ export default function AdminProductsPage() {
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
   const productsQuery = useMemoFirebase(
-    () => (firestore && user && !isUserLoading ? collection(firestore, 'products') : null),
-    [firestore, user, isUserLoading]
+    () => (firestore && user ? collection(firestore, 'products') : null),
+    [firestore, user]
   );
   const { data: products, isLoading } = useCollection<Product & { createdAt: Timestamp }>(productsQuery);
 
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
 
-  const filteredProducts = products?.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredProducts = useMemo(() => 
+    products?.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())),
+    [products, searchTerm]
+  );
 
   const handleDeleteProduct = async () => {
-    if (!productToDelete || !firestore) {
+    if (!productToDelete || !firestore || !user) {
       toast({ title: "Error", description: "Product not selected or database not available.", variant: "destructive" });
       return;
     }
 
+    const productRef = doc(firestore, 'products', productToDelete.id);
+    const variantsRef = collection(firestore, 'products', productToDelete.id, 'variants');
+
     try {
-      // 1. Delete variants subcollection
-      const variantsRef = collection(firestore, 'products', productToDelete.id, 'variants');
-      const variantsSnapshot = await getDocs(variantsRef);
-      const batch = writeBatch(firestore);
-      variantsSnapshot.forEach(doc => {
-        batch.delete(doc.ref);
-      });
-      await batch.commit();
+        // Batch delete variants
+        const variantsSnapshot = await getDocs(variantsRef);
+        const batch = writeBatch(firestore);
+        variantsSnapshot.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+        await batch.commit();
 
-      // 2. Delete images from Firebase Storage
-      const storage = getStorage();
-      for (const imageUrl of productToDelete.images) {
-        try {
-          const imageRef = ref(storage, imageUrl);
-          await deleteObject(imageRef);
-        } catch (storageError: any) {
-          if (storageError.code !== 'storage/object-not-found') {
-             console.warn(`Could not delete image ${imageUrl}:`, storageError);
-          }
+        // Delete images from Storage
+        const storage = getStorage();
+        for (const imageUrl of productToDelete.images) {
+            try {
+                const imageRef = ref(storage, imageUrl);
+                await deleteObject(imageRef);
+            } catch (storageError: any) {
+                if (storageError.code !== 'storage/object-not-found') {
+                    console.warn(`Could not delete image ${imageUrl}:`, storageError);
+                }
+            }
         }
-      }
 
-      // 3. Delete the product document
-      await deleteDoc(doc(firestore, 'products', productToDelete.id));
+        // Delete the product document itself
+        await deleteDoc(productRef);
 
-      toast({
-        title: "Product Deleted",
-        description: `"${productToDelete.name}" has been successfully deleted.`,
-      });
+        toast({
+            title: "Product Deleted",
+            description: `"${productToDelete.name}" has been successfully deleted.`,
+        });
+
     } catch (error) {
-      console.error("Error deleting product:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete the product. Please try again.",
-        variant: "destructive",
-      });
+        const permissionError = new FirestorePermissionError({
+            path: productRef.path,
+            operation: 'delete',
+        });
+        errorEmitter.emit('permission-error', permissionError);
     } finally {
-      setProductToDelete(null);
+        setProductToDelete(null);
     }
   };
 
@@ -213,59 +218,9 @@ export default function AdminProductsPage() {
                       <ProductRowSkeleton />
                     </>
                   ) : filteredProducts && filteredProducts.length > 0 ? (
-                    filteredProducts.map(product => {
-                      const variantsCollection = useMemoFirebase(() => (firestore ? collection(firestore, 'products', product.id, 'variants') : null), [firestore, product.id]);
-                      const { data: variants } = useCollection<ProductVariant>(variantsCollection);
-                      const hasStock = variants ? variants.some(v => v.stock > 0) : false;
-
-                      return (
-                      <TableRow key={product.id}>
-                        <TableCell className="hidden sm:table-cell">
-                          <Image
-                            alt={product.name}
-                            className="aspect-square rounded-md object-cover"
-                            height="64"
-                            src={product.images[0]}
-                            width="64"
-                          />
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {product.name}
-                        </TableCell>
-                        <TableCell>
-                           <Badge variant={hasStock ? "default" : "outline"}>
-                            {hasStock ? "In Stock" : "Out of Stock"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          ${product.price.toFixed(2)}
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          {product.createdAt ? product.createdAt.toDate().toLocaleDateString() : 'N/A'}
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button aria-haspopup="true" size="icon" variant="ghost">
-                                <MoreHorizontal className="h-4 w-4" />
-                                <span className="sr-only">Toggle menu</span>
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuItem>Edit</DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="text-destructive focus:bg-destructive focus:text-destructive-foreground"
-                                onClick={() => setProductToDelete(product)}
-                              >
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                      );
-                    })
+                    filteredProducts.map(product => (
+                      <ProductRow key={product.id} product={product} onSelectDelete={setProductToDelete} />
+                    ))
                   ) : (
                     <TableRow>
                       <TableCell colSpan={6} className="h-24 text-center">
@@ -316,3 +271,59 @@ export default function AdminProductsPage() {
     </>
   );
 }
+
+// Memoized row component to avoid re-rendering every row on filter change
+const ProductRow = memo(function ProductRow({ product, onSelectDelete }: { product: Product & { createdAt: Timestamp }, onSelectDelete: (product: Product) => void}) {
+    const firestore = useFirestore();
+    const variantsCollection = useMemoFirebase(() => (firestore ? collection(firestore, 'products', product.id, 'variants') : null), [firestore, product.id]);
+    const { data: variants } = useCollection<ProductVariant>(variantsCollection);
+    const hasStock = variants ? variants.some(v => v.stock > 0) : false;
+
+    return (
+        <TableRow>
+            <TableCell className="hidden sm:table-cell">
+                <Image
+                    alt={product.name}
+                    className="aspect-square rounded-md object-cover"
+                    height="64"
+                    src={product.images[0]}
+                    width="64"
+                />
+            </TableCell>
+            <TableCell className="font-medium">
+                {product.name}
+            </TableCell>
+            <TableCell>
+                <Badge variant={hasStock ? "default" : "outline"}>
+                {hasStock ? "In Stock" : "Out of Stock"}
+                </Badge>
+            </TableCell>
+            <TableCell className="hidden md:table-cell">
+                ${product.price.toFixed(2)}
+            </TableCell>
+            <TableCell className="hidden md:table-cell">
+                {product.createdAt ? product.createdAt.toDate().toLocaleDateString() : 'N/A'}
+            </TableCell>
+            <TableCell>
+                <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button aria-haspopup="true" size="icon" variant="ghost">
+                    <MoreHorizontal className="h-4 w-4" />
+                    <span className="sr-only">Toggle menu</span>
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                    <DropdownMenuItem>Edit</DropdownMenuItem>
+                    <DropdownMenuItem
+                    className="text-destructive focus:bg-destructive focus:text-destructive-foreground"
+                    onClick={() => onSelectDelete(product)}
+                    >
+                    Delete
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+                </DropdownMenu>
+            </TableCell>
+        </TableRow>
+    );
+});

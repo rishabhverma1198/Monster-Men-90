@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -20,15 +20,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import type { Product, ProductVariant } from "@/lib/types";
-import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, doc, getDocs, query, updateDoc, writeBatch } from "firebase/firestore";
+import { useCollection, useFirestore, useMemoFirebase, useUser, errorEmitter, FirestorePermissionError } from "@/firebase";
+import { collection, doc, getDocs, query, updateDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
 
 interface InventoryItem extends ProductVariant {
   id: string; // Document ID of the variant
-  productId: string;
   productName: string;
   category: string;
 }
@@ -50,68 +48,79 @@ export default function InventoryPage() {
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isDerivingInventory, setIsDerivingInventory] = useState(true);
 
-  // Fetch all products first
   const productsQuery = useMemoFirebase(
-    () => (firestore && !isUserLoading ? collection(firestore, 'products') : null),
-    [firestore, isUserLoading]
+    () => (firestore && user ? collection(firestore, 'products') : null),
+    [firestore, user]
   );
   const { data: products, isLoading: productsLoading } = useCollection<Product>(productsQuery);
 
-  // Then fetch all variants for each product
-  useState(() => {
+  useEffect(() => {
     if (products && firestore) {
       const fetchAllVariants = async () => {
-        setIsLoading(true);
+        setIsDerivingInventory(true);
         const allItems: InventoryItem[] = [];
-        for (const p of products) {
-          const variantsQuery = collection(firestore, 'products', p.id, 'variants');
-          const variantsSnapshot = await getDocs(variantsQuery);
-          variantsSnapshot.forEach(variantDoc => {
-            const variantData = variantDoc.data() as ProductVariant;
-            allItems.push({
-              ...variantData,
-              id: variantDoc.id,
-              productId: p.id,
-              productName: p.name,
-              category: p.category,
+        try {
+          for (const p of products) {
+            const variantsQuery = collection(firestore, 'products', p.id, 'variants');
+            const variantsSnapshot = await getDocs(variantsQuery);
+            variantsSnapshot.forEach(variantDoc => {
+              const variantData = variantDoc.data() as ProductVariant;
+              allItems.push({
+                ...variantData,
+                id: variantDoc.id,
+                productId: p.id,
+                productName: p.name,
+                category: p.category,
+              });
             });
-          });
+          }
+          setInventory(allItems);
+        } catch (e: any) {
+            const permissionError = new FirestorePermissionError({
+                path: 'products', // Generic path as it iterates
+                operation: 'list',
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        } finally {
+            setIsDerivingInventory(false);
         }
-        setInventory(allItems);
-        setIsLoading(false);
       };
       fetchAllVariants();
     } else if (!productsLoading) {
-      setIsLoading(false);
+      setIsDerivingInventory(false);
     }
   }, [products, firestore, productsLoading]);
 
 
-  const handleStockChange = async (productId: string, variantId: string, newStock: number) => {
-    if (!firestore || newStock < 0) return;
+  const handleStockChange = (productId: string, variantId: string, newStock: number) => {
+    if (!firestore || newStock < 0 || !user) return;
     
     const variantRef = doc(firestore, 'products', productId, 'variants', variantId);
+    const updatedData = { stock: newStock };
     
-    try {
-      await updateDoc(variantRef, { stock: newStock });
-      setInventory(prev => prev.map(item => 
-        item.id === variantId ? { ...item, stock: newStock } : item
-      ));
-      toast({
-        title: "Stock Updated",
-        description: `Stock for the variant has been updated to ${newStock}.`,
+    updateDoc(variantRef, updatedData)
+      .then(() => {
+        setInventory(prev => prev.map(item => 
+          item.id === variantId ? { ...item, stock: newStock } : item
+        ));
+        toast({
+          title: "Stock Updated",
+          description: `Stock for the variant has been updated to ${newStock}.`,
+        });
+      })
+      .catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+            path: variantRef.path,
+            operation: 'update',
+            requestResourceData: updatedData
+        });
+        errorEmitter.emit('permission-error', permissionError);
       });
-    } catch(e) {
-      console.error("Failed to update stock: ", e);
-      toast({
-        title: "Update Failed",
-        description: "Could not update the variant's stock.",
-        variant: "destructive"
-      });
-    }
   };
+
+  const isLoading = productsLoading || isUserLoading || isDerivingInventory;
   
   return (
     <div className="flex flex-col gap-4">
@@ -136,7 +145,7 @@ export default function InventoryPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading || isUserLoading ? (
+              {isLoading ? (
                 <>
                   <InventoryRowSkeleton />
                   <InventoryRowSkeleton />
@@ -182,3 +191,4 @@ export default function InventoryPage() {
     </div>
   );
 }
+
