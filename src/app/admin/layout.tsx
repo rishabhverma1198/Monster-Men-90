@@ -41,7 +41,7 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 type AuthState = "loading" | "authenticated" | "unauthenticated" | "not-admin" | "error";
-type VerificationStep = "Verifying Login" | "Checking Admin Privileges" | "Creating Admin User" | "Done";
+type VerificationStep = "Initializing..." | "Checking Admin Privileges" | "Creating Admin User" | "Done";
 
 export default function AdminLayout({
   children,
@@ -53,7 +53,7 @@ export default function AdminLayout({
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
   const [authState, setAuthState] = useState<AuthState>("loading");
-  const [verificationStep, setVerificationStep] = useState<VerificationStep>("Verifying Login");
+  const [verificationStep, setVerificationStep] = useState<VerificationStep>("Initializing...");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -62,19 +62,21 @@ export default function AdminLayout({
     if (isUserLoading || !firestore || !auth) {
       console.log("[AdminLayout] State: LOADING - Waiting for user and Firebase services.");
       setAuthState("loading");
-      setVerificationStep("Verifying Login");
+      setVerificationStep("Initializing...");
       return;
     }
 
     if (!user) {
       console.log("[AdminLayout] State: UNAUTHENTICATED - No user found. Redirecting to /admin/login.");
       setAuthState("unauthenticated");
+      // Use replace to prevent the loading page from being in the history
       router.replace("/admin/login");
       return;
     }
 
     console.log(`[AdminLayout] State: VERIFYING ADMIN - User found (UID: ${user.uid}). Checking admin status.`);
     setVerificationStep("Checking Admin Privileges");
+    setAuthState("loading"); // Show loading while checking admin status
 
     const checkAdminStatus = async () => {
       try {
@@ -88,14 +90,15 @@ export default function AdminLayout({
           setVerificationStep("Done");
         } else {
             // MANUAL ADMIN CREATION FAILSAFE
-            // If the logged-in user is the one from our config but not in the 'admins' table, create it.
             if (user.email === "jayantv427@gmail.com") {
                 console.log("[AdminLayout] User is default admin email, but not in 'admins' collection. Creating admin entry...");
                 setVerificationStep("Creating Admin User");
                 const adminData = { isAdmin: true, createdAt: new Date() };
-                await setDoc(adminDocRef, adminData); // Using await here is crucial for this step
+                await setDoc(adminDocRef, adminData);
                 console.log("[AdminLayout] Admin entry created. Re-checking status.");
-                checkAdminStatus(); // Re-run the check
+                // After creating, re-verify to transition to authenticated state
+                setAuthState("authenticated");
+                setVerificationStep("Done");
             } else {
                 console.log("[AdminLayout] State: NOT-ADMIN - Admin document does not exist. Signing out and redirecting.");
                 await signOut(auth);
@@ -128,11 +131,19 @@ export default function AdminLayout({
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <div className="w-full max-w-md p-4 space-y-4">
-            {(authState === "loading" || authState === 'unauthenticated') && (
+            {authState === "loading" && (
                 <div className="flex flex-col items-center justify-center gap-4 p-8 rounded-lg border">
                     <div className="flex items-center gap-3 text-lg font-semibold">
                         <Loader2 className="h-5 w-5 animate-spin" />
-                        <span>{authState === 'unauthenticated' ? 'Redirecting to login...' : `${verificationStep}...`}</span>
+                        <span>{verificationStep}...</span>
+                    </div>
+                </div>
+            )}
+            {authState === 'unauthenticated' && (
+                 <div className="flex flex-col items-center justify-center gap-4 p-8 rounded-lg border">
+                    <div className="flex items-center gap-3 text-lg font-semibold">
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span>Redirecting to login...</span>
                     </div>
                 </div>
             )}
