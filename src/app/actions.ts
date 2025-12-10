@@ -1,45 +1,23 @@
 
 "use server";
 
-import type { CartItem, Order } from "@/lib/types";
-import { collection, doc, setDoc, serverTimestamp, getDocs, query, where, Timestamp } from "firebase/firestore";
+import type { Order } from "@/lib/types";
+import { collection, doc, setDoc, serverTimestamp, getDocs, query, where, Timestamp, getFirestore } from "firebase/firestore";
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
-import { getAuth, signInAnonymously } from "firebase/auth";
-import { firebaseConfig } from "@/firebase/config";
 
-
-// This function needs its own separate Firebase initialization
-// because Server Actions run in a separate environment.
-async function getFirebaseInstances() {
-    let app;
+// This function is simplified for server-side execution.
+// App Hosting provides automatic configuration and authentication.
+function getDb() {
     if (!getApps().length) {
-      try {
-        // This will automatically use the correct configuration on Firebase App Hosting
-        app = initializeApp();
-      } catch (e) {
-        console.warn('Automatic initialization failed. Falling back to firebase config object.', e);
-        // This is the fallback for local development
-        app = initializeApp(firebaseConfig);
-      }
-    } else {
-      app = getApp();
+      initializeApp();
     }
-    
-    const db = getFirestore(app);
-    const auth = getAuth(app);
-
-    // Ensure we have an authenticated user for server actions
-    if (!auth.currentUser) {
-        await signInAnonymously(auth);
-    }
-    return { db, auth };
+    return getFirestore(getApp());
 }
 
 
 export async function createOrder(orderInput: any): Promise<{ success: boolean; orderId?: string; error?: string }> {
   try {
-    const { db } = await getFirebaseInstances();
+    const db = getDb();
 
     // 1. Generate a unique Order ID
     const orderId = `MM90-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
@@ -66,7 +44,7 @@ export async function createOrder(orderInput: any): Promise<{ success: boolean; 
 
 export async function trackOrder(orderId: string, phone: string): Promise<{ success: boolean; order?: Order; error?: string }> {
     try {
-        const { db } = await getFirebaseInstances();
+        const db = getDb();
         
         const q = query(collection(db, "orders_leads"), where("orderId", "==", orderId), where("phone", "==", phone));
         const querySnapshot = await getDocs(q);
