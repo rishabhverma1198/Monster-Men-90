@@ -31,32 +31,17 @@ const dummyRecentOrders = Array.from({ length: 5 }, (_, i) => ({
 }));
 
 
-function StatCardSkeleton() {
-    return (
-        <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-4 w-4" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-7 w-20" />
-              <Skeleton className="h-3 w-32 mt-2" />
-            </CardContent>
-        </Card>
-    )
-}
-
 export default function AdminDashboard() {
   const firestore = useFirestore();
-  const { user, isUserLoading } = useUser();
-  const [counts, setCounts] = useState({ products: 0, orders: 0 });
-  const [isCounting, setIsCounting] = useState(true);
+  const { user } = useUser();
+  const [counts, setCounts] = useState<{ products: number | null; orders: number | null }>({ products: null, orders: null });
 
   useEffect(() => {
-    if (!firestore || !user) return;
-    
+    // Fetch counts in the background after the component has mounted
+    // This allows the page to render instantly with initial values.
     const fetchCounts = async () => {
-      setIsCounting(true);
+      if (!firestore || !user) return;
+      
       try {
         const productsRef = collection(firestore, 'products');
         const ordersRef = collection(firestore, 'orders_leads');
@@ -70,29 +55,17 @@ export default function AdminDashboard() {
         });
       } catch (error) {
         console.error("Error fetching counts: ", error);
+        // Set to 0 on error to avoid showing loading state indefinitely
         setCounts({ products: 0, orders: 0 });
-      } finally {
-        setIsCounting(false);
       }
     };
 
     fetchCounts();
   }, [firestore, user]);
     
-  const isLoading = isUserLoading || isCounting;
-
   return (
     <div className="flex w-full flex-col gap-4 md:gap-8">
         <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
-          {isLoading ? (
-            <>
-                <StatCardSkeleton />
-                <StatCardSkeleton />
-                <StatCardSkeleton />
-                <StatCardSkeleton />
-            </>
-          ) : (
-          <>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
@@ -113,7 +86,11 @@ export default function AdminDashboard() {
                 <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">+{counts.orders}</div>
+                {counts.orders === null ? (
+                    <Skeleton className="h-7 w-20" />
+                ) : (
+                    <div className="text-2xl font-bold">+{counts.orders}</div>
+                )}
                 <p className="text-xs text-muted-foreground">
                   Total leads generated
                 </p>
@@ -125,7 +102,11 @@ export default function AdminDashboard() {
                 <ShoppingCart className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">+{counts.orders}</div>
+                 {counts.orders === null ? (
+                    <Skeleton className="h-7 w-20" />
+                ) : (
+                    <div className="text-2xl font-bold">+{counts.orders}</div>
+                )}
                 <p className="text-xs text-muted-foreground">
                   Total orders placed
                 </p>
@@ -137,14 +118,16 @@ export default function AdminDashboard() {
                 <Package className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{counts.products}</div>
+                 {counts.products === null ? (
+                    <Skeleton className="h-7 w-20" />
+                ) : (
+                    <div className="text-2xl font-bold">{counts.products}</div>
+                )}
                 <p className="text-xs text-muted-foreground">
                   Total products in store
                 </p>
               </CardContent>
             </Card>
-          </>
-          )}
         </div>
         <div className="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-3">
           <Card className="xl:col-span-2">
