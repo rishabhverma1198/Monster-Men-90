@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -49,6 +49,7 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const auth = useAuth();
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
@@ -57,50 +58,37 @@ export default function AdminLayout({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    console.log(`[AdminLayout] useEffect triggered. isUserLoading: ${isUserLoading}, user: ${!!user}, firestore: ${!!firestore}`);
-
     if (isUserLoading || !firestore || !auth) {
-      console.log("[AdminLayout] State: LOADING - Waiting for user and Firebase services.");
       setAuthState("loading");
       setVerificationStep("Initializing...");
       return;
     }
 
     if (!user) {
-      console.log("[AdminLayout] State: UNAUTHENTICATED - No user found. Redirecting to /admin/login.");
-      setAuthState("unauthenticated");
-      // Use replace to prevent the loading page from being in the history
       router.replace("/admin/login");
       return;
     }
 
-    console.log(`[AdminLayout] State: VERIFYING ADMIN - User found (UID: ${user.uid}). Checking admin status.`);
     setVerificationStep("Checking Admin Privileges");
-    setAuthState("loading"); // Show loading while checking admin status
+    setAuthState("loading");
 
     const checkAdminStatus = async () => {
       try {
         const adminDocRef = doc(firestore, "admins", user.uid);
-        console.log(`[AdminLayout] Fetching document from Firestore: admins/${user.uid}`);
         const adminDoc = await getDoc(adminDocRef);
 
         if (adminDoc.exists()) {
-          console.log("[AdminLayout] State: AUTHENTICATED - Admin document found. User is an admin.");
           setAuthState("authenticated");
           setVerificationStep("Done");
         } else {
-            // MANUAL ADMIN CREATION FAILSAFE
             if (user.email === "jayantv427@gmail.com") {
                 console.log("[AdminLayout] User is default admin email, but not in 'admins' collection. Creating admin entry...");
                 setVerificationStep("Creating Admin User");
                 const adminData = { isAdmin: true, createdAt: new Date() };
                 await setDoc(adminDocRef, adminData);
-                console.log("[AdminLayout] Admin entry created. Re-checking status.");
-                // After creating, re-verify to transition to authenticated state
                 setAuthState("authenticated");
                 setVerificationStep("Done");
             } else {
-                console.log("[AdminLayout] State: NOT-ADMIN - Admin document does not exist. Signing out and redirecting.");
                 await signOut(auth);
                 setAuthState("not-admin");
                 router.replace("/admin/login?error=not-admin");
@@ -119,13 +107,18 @@ export default function AdminLayout({
 
   const handleLogout = async () => {
     if (auth) {
-      console.log("[AdminLayout] handleLogout called. Signing out user.");
       await signOut(auth);
       router.push("/admin/login");
     }
   };
 
-  console.log(`[AdminLayout] Rendering UI with authState: ${authState}`);
+  const menuItems = [
+    { href: "/admin", icon: <Home />, label: "Dashboard" },
+    { href: "/admin/orders", icon: <ShoppingCart />, label: "Orders" },
+    { href: "/admin/products", icon: <Package2 />, label: "Products" },
+    { href: "/admin/leads", icon: <Users />, label: "Leads" },
+    { href: "/admin/inventory", icon: <Boxes />, label: "Inventory" },
+  ];
 
   if (authState !== "authenticated") {
     return (
@@ -139,7 +132,7 @@ export default function AdminLayout({
                     </div>
                 </div>
             )}
-            {authState === 'unauthenticated' && (
+             {authState === 'unauthenticated' && (
                  <div className="flex flex-col items-center justify-center gap-4 p-8 rounded-lg border">
                     <div className="flex items-center gap-3 text-lg font-semibold">
                         <Loader2 className="h-5 w-5 animate-spin" />
@@ -183,46 +176,16 @@ export default function AdminLayout({
           </SidebarHeader>
           <SidebarContent>
             <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Dashboard">
-                  <Link href="/admin">
-                    <Home />
-                    <span>Dashboard</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Orders">
-                  <Link href="/admin/orders">
-                    <ShoppingCart />
-                    <span>Orders</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Products">
-                  <Link href="/admin/products">
-                    <Package2 />
-                    <span>Products</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Leads">
-                  <Link href="/admin/leads">
-                    <Users />
-                    <span>Leads</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Inventory">
-                  <Link href="/admin/inventory">
-                    <Boxes />
-                    <span>Inventory</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              {menuItems.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton asChild tooltip={item.label} isActive={pathname === item.href}>
+                    <Link href={item.href}>
+                      {item.icon}
+                      <span>{item.label}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
             </SidebarMenu>
           </SidebarContent>
         </Sidebar>
