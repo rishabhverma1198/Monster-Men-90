@@ -1,7 +1,8 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from 'next/navigation';
 import {
   Card,
   CardContent,
@@ -25,8 +26,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Order } from "@/lib/types";
-import { useFirestore, useUser, errorEmitter, FirestorePermissionError, useDoc, useMemoFirebase } from "@/firebase";
-import { doc, updateDoc, Timestamp } from "firebase/firestore";
+import { useFirestore, useUser, errorEmitter, FirestorePermissionError } from "@/firebase";
+import { doc, updateDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,15 +48,30 @@ export default function OrdersPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
+  const searchParams = useSearchParams();
   
-  const [orderId, setOrderId] = useState("");
-  const [phone, setPhone] = useState("");
+  const [orderId, setOrderId] = useState(searchParams.get('orderId') || "");
+  const [phone, setPhone] = useState(searchParams.get('phone') || "");
   const [isLoading, setIsLoading] = useState(false);
   const [searchedOrder, setSearchedOrder] = useState<Order | null>(null);
   const [error, setError] = useState<string | null>(null);
+  
+  // Effect to auto-search if params are present in URL
+  useEffect(() => {
+    const initialOrderId = searchParams.get('orderId');
+    const initialPhone = searchParams.get('phone');
+    if (initialOrderId && initialPhone) {
+      handleTrackOrder();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
-  const handleTrackOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleTrackOrder = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!orderId || !phone) {
+        setError("Please provide both Order ID and Phone Number.");
+        return;
+    }
     setIsLoading(true);
     setSearchedOrder(null);
     setError(null);
