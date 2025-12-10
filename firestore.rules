@@ -26,19 +26,10 @@ service cloud.firestore {
       }
     }
     
-    // IMPORTANT: Listing all orders is now disallowed by default.
-    // This was the source of the permission errors.
-    // The app should use specific queries (like track order) instead.
-    // We only allow admin to list recent 5 orders for the dashboard.
-    match /orders_leads {
-        allow list: if isAdmin() && query.limit <= 5;
-    }
-
-    // Individual orders can be created by anyone (checkout process).
-    // Only the admin can read, update, or delete a specific order document.
+    // Allow admin to list all orders for the leads page.
     match /orders_leads/{orderId} {
       allow create: if true;
-      allow get, update, delete: if isAdmin();
+      allow get, update, delete, list: if isAdmin();
     }
   }
 }
