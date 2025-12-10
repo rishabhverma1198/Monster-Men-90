@@ -1,5 +1,5 @@
-# Firebase Studio
+# MonserMens90 - The Full Project
 
 This is a NextJS starter in Firebase Studio.
 
-To get started, take a look at src/app/page.tsx.
+This repository now contains the full source code for the MonserMens90 e-commerce application.
